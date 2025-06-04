@@ -1,0 +1,425 @@
+/**
+ * Mobile-First Responsive Styles
+ * 
+ * This file contains mobile-optimized styles for ClinicBoost,
+ * including touch-friendly interactions, performance optimizations,
+ * and responsive design patterns.
+ */
+
+/* Mobile-first base styles */
+@media (max-width: 767px) {
+  /* Touch-friendly interactions */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px;
+  }
+
+  /* Improved tap targets */
+  button, 
+  [role="button"], 
+  a {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+
+  /* Mobile-optimized forms */
+  input, 
+  textarea, 
+  select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  /* Mobile-friendly tables */
+  .mobile-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .mobile-table table {
+    width: 100%;
+    min-width: 600px;
+  }
+
+  /* Stack cards vertically on mobile */
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Mobile navigation */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: env(safe-area-inset-bottom) 0 0 0;
+    z-index: 50;
+  }
+
+  /* Mobile header */
+  .mobile-header {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Mobile content */
+  .mobile-content {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Show mobile-only elements */
+  .mobile-only {
+    display: block !important;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tablet-specific optimizations */
+  .tablet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  /* Tablet navigation */
+  .tablet-nav {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+  }
+
+  /* Hide mobile-only elements */
+  .mobile-only {
+    display: none !important;
+  }
+
+  /* Show tablet elements */
+  .tablet-only {
+    display: block !important;
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 1024px) {
+  /* Hide mobile and tablet only elements */
+  .mobile-only,
+  .tablet-only {
+    display: none !important;
+  }
+
+  /* Show desktop elements */
+  .desktop-only {
+    display: block !important;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  .touch-optimized {
+    padding: 16px;
+    margin: 8px;
+  }
+
+  /* Remove hover effects on touch devices */
+  .no-touch-hover:hover {
+    background-color: inherit;
+    color: inherit;
+  }
+
+  /* Touch-friendly scrollbars */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .touch-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .touch-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .touch-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Crisp images on retina displays */
+  .retina-image {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable animations for users who prefer reduced motion */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential animations but reduce them */
+  .essential-animation {
+    animation-duration: 0.3s !important;
+    transition-duration: 0.3s !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  /* Enhanced contrast for better accessibility */
+  .high-contrast {
+    border: 2px solid currentColor;
+    background-color: white;
+    color: black;
+  }
+
+  .high-contrast-dark {
+    background-color: black;
+    color: white;
+    border: 2px solid white;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode specific mobile optimizations */
+  .mobile-nav {
+    background: #1f2937;
+    border-top-color: #374151;
+  }
+
+  .mobile-header {
+    background: #1f2937;
+    border-bottom-color: #374151;
+  }
+}
+
+/* Performance optimizations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.optimize-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* Network-aware loading */
+.slow-network .lazy-load {
+  background-image: none !important;
+}
+
+.slow-network .high-quality {
+  display: none !important;
+}
+
+.slow-network .low-quality {
+  display: block !important;
+}
+
+/* Battery-aware optimizations */
+.low-battery .animation {
+  animation: none !important;
+  transition: none !important;
+}
+
+.low-battery .gpu-accelerated {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Orientation-specific styles */
+@media (orientation: landscape) {
+  .landscape-only {
+    display: block !important;
+  }
+
+  .portrait-only {
+    display: none !important;
+  }
+
+  /* Landscape mobile optimizations */
+  @media (max-height: 500px) {
+    .mobile-header {
+      height: 48px;
+    }
+
+    .mobile-nav {
+      height: 48px;
+    }
+
+    .compact-mobile {
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+  }
+}
+
+@media (orientation: portrait) {
+  .portrait-only {
+    display: block !important;
+  }
+
+  .landscape-only {
+    display: none !important;
+  }
+}
+
+/* Safe area support */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-all {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Utility classes for responsive design */
+.mobile-hidden {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .mobile-hidden {
+    display: block;
+  }
+}
+
+.tablet-hidden {
+  display: block;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-hidden {
+    display: none;
+  }
+}
+
+.desktop-hidden {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .desktop-hidden {
+    display: none;
+  }
+}
+
+/* Mobile-first grid system */
+.mobile-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .mobile-grid.sm-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-grid.md-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-grid.lg-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Mobile-optimized animations */
+@keyframes mobile-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes mobile-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-slide-in {
+  animation: mobile-slide-in 0.3s ease-out;
+}
+
+.mobile-fade-in {
+  animation: mobile-fade-in 0.3s ease-out;
+}
+
+/* Performance monitoring styles */
+.performance-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #fbbf24;
+  color: #92400e;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  z-index: 9999;
+}
+
+.performance-critical {
+  background: #ef4444;
+  color: white;
+}

@@ -1,0 +1,515 @@
+/**
+ * Comprehensive Accessibility Styles
+ * 
+ * This stylesheet provides comprehensive accessibility support including:
+ * - WCAG 2.1 AA/AAA compliant focus indicators
+ * - High contrast mode support
+ * - Reduced motion preferences
+ * - Screen reader optimizations
+ * - Keyboard navigation enhancements
+ * - Color blindness accommodations
+ */
+
+/* =============================================================================
+   SCREEN READER UTILITIES
+   ============================================================================= */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Screen reader only content that becomes visible on focus */
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* =============================================================================
+   FOCUS MANAGEMENT
+   ============================================================================= */
+
+/* Default focus styles - hidden until keyboard navigation is detected */
+*:focus {
+  outline: none;
+}
+
+/* Keyboard navigation focus indicators */
+.keyboard-navigation *:focus,
+.focus-visible {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 2px !important;
+  border-radius: 2px;
+}
+
+/* Enhanced focus for interactive elements */
+.keyboard-navigation button:focus,
+.keyboard-navigation a:focus,
+.keyboard-navigation input:focus,
+.keyboard-navigation select:focus,
+.keyboard-navigation textarea:focus,
+.keyboard-navigation [role="button"]:focus,
+.keyboard-navigation [role="link"]:focus,
+.keyboard-navigation [tabindex]:focus {
+  outline: 3px solid #0066cc !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 1px rgba(0, 102, 204, 0.3) !important;
+}
+
+/* Focus within containers */
+.keyboard-navigation *:focus-within {
+  outline: 1px solid rgba(0, 102, 204, 0.5) !important;
+  outline-offset: 1px !important;
+}
+
+/* Skip focus for decorative elements */
+[aria-hidden="true"]:focus,
+[role="presentation"]:focus,
+[role="none"]:focus {
+  outline: none !important;
+}
+
+/* =============================================================================
+   HIGH CONTRAST MODE
+   ============================================================================= */
+
+/* High contrast mode styles */
+.high-contrast {
+  --bg-primary: #000000;
+  --bg-secondary: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --border-color: #ffffff;
+  --focus-color: #ffff00;
+  --link-color: #00ffff;
+  --button-bg: #333333;
+  --button-text: #ffffff;
+  --error-color: #ff6666;
+  --success-color: #66ff66;
+  --warning-color: #ffff66;
+}
+
+.high-contrast * {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.high-contrast *:focus {
+  outline: 3px solid var(--focus-color) !important;
+  outline-offset: 2px !important;
+  background-color: var(--bg-secondary) !important;
+}
+
+.high-contrast a {
+  color: var(--link-color) !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast button,
+.high-contrast [role="button"] {
+  background-color: var(--button-bg) !important;
+  color: var(--button-text) !important;
+  border: 2px solid var(--border-color) !important;
+}
+
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 2px solid var(--border-color) !important;
+}
+
+/* High contrast error states */
+.high-contrast .error,
+.high-contrast [aria-invalid="true"] {
+  color: var(--error-color) !important;
+  border-color: var(--error-color) !important;
+}
+
+.high-contrast .success {
+  color: var(--success-color) !important;
+  border-color: var(--success-color) !important;
+}
+
+.high-contrast .warning {
+  color: var(--warning-color) !important;
+  border-color: var(--warning-color) !important;
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduced motion class for programmatic control */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* =============================================================================
+   SKIP LINKS
+   ============================================================================= */
+
+.skip-links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000000;
+  color: #ffffff;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 0 0 4px 4px;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 10000;
+  transition: top 0.3s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid #ffff00;
+  outline-offset: 2px;
+}
+
+/* =============================================================================
+   KEYBOARD NAVIGATION ENHANCEMENTS
+   ============================================================================= */
+
+/* Roving tabindex support */
+[data-navigation-group] {
+  position: relative;
+}
+
+[data-navigation-group][tabindex="-1"] {
+  outline: none;
+}
+
+/* Navigation group indicators */
+.keyboard-navigation [data-navigation-group]:focus-within::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 1px dashed rgba(0, 102, 204, 0.5);
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+/* =============================================================================
+   FORM ACCESSIBILITY
+   ============================================================================= */
+
+/* Required field indicators */
+[required]::after,
+[aria-required="true"]::after {
+  content: " *";
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+/* Error states */
+[aria-invalid="true"] {
+  border-color: #d32f2f !important;
+  box-shadow: 0 0 0 1px #d32f2f !important;
+}
+
+/* Error messages */
+[role="alert"],
+.error-message {
+  color: #d32f2f;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Success states */
+[aria-invalid="false"] {
+  border-color: #2e7d32 !important;
+}
+
+/* Form field descriptions */
+.field-description {
+  font-size: 0.875rem;
+  color: #666666;
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   LIVE REGIONS
+   ============================================================================= */
+
+[aria-live] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Status messages */
+[role="status"] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Alert messages */
+[role="alert"] {
+  padding: 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+/* =============================================================================
+   COLOR BLINDNESS SUPPORT
+   ============================================================================= */
+
+/* Protanopia (Red-blind) simulation */
+.colorblind-protanopia {
+  filter: url(#protanopia-filter);
+}
+
+/* Deuteranopia (Green-blind) simulation */
+.colorblind-deuteranopia {
+  filter: url(#deuteranopia-filter);
+}
+
+/* Tritanopia (Blue-blind) simulation */
+.colorblind-tritanopia {
+  filter: url(#tritanopia-filter);
+}
+
+/* Achromatopsia (Complete color blindness) simulation */
+.colorblind-achromatopsia {
+  filter: grayscale(100%);
+}
+
+/* =============================================================================
+   LARGE TEXT SUPPORT
+   ============================================================================= */
+
+.large-text {
+  font-size: 1.25em !important;
+  line-height: 1.6 !important;
+}
+
+.large-text h1 { font-size: 2.5rem !important; }
+.large-text h2 { font-size: 2rem !important; }
+.large-text h3 { font-size: 1.75rem !important; }
+.large-text h4 { font-size: 1.5rem !important; }
+.large-text h5 { font-size: 1.25rem !important; }
+.large-text h6 { font-size: 1.125rem !important; }
+
+.large-text button,
+.large-text input,
+.large-text select,
+.large-text textarea {
+  font-size: 1.125rem !important;
+  padding: 12px 16px !important;
+}
+
+/* =============================================================================
+   FOCUS TRAPS
+   ============================================================================= */
+
+.focus-trap-active {
+  position: relative;
+}
+
+.focus-trap-active::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px dashed #0066cc;
+  pointer-events: none;
+  z-index: 1000;
+  border-radius: 4px;
+}
+
+/* =============================================================================
+   CUSTOM COLORS SUPPORT
+   ============================================================================= */
+
+.custom-colors {
+  background-color: var(--custom-bg) !important;
+  color: var(--custom-fg) !important;
+}
+
+.custom-colors a {
+  color: var(--custom-accent) !important;
+}
+
+.custom-colors button {
+  background-color: var(--custom-accent) !important;
+  color: var(--custom-bg) !important;
+}
+
+/* =============================================================================
+   RESPONSIVE ACCESSIBILITY
+   ============================================================================= */
+
+/* Touch target sizes for mobile */
+@media (max-width: 768px) {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [role="link"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* =============================================================================
+   PRINT ACCESSIBILITY
+   ============================================================================= */
+
+@media print {
+  /* Ensure focus indicators are visible in print */
+  *:focus {
+    outline: 2px solid #000000 !important;
+  }
+  
+  /* Show URLs for links */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666666;
+  }
+  
+  /* Hide decorative elements */
+  [aria-hidden="true"],
+  [role="presentation"] {
+    display: none !important;
+  }
+}
+
+/* =============================================================================
+   BROWSER-SPECIFIC ACCESSIBILITY FIXES
+   ============================================================================= */
+
+/* Firefox focus outline fix */
+@-moz-document url-prefix() {
+  .keyboard-navigation *:focus {
+    outline: 2px solid #0066cc !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* Safari focus outline fix */
+@supports (-webkit-appearance: none) {
+  .keyboard-navigation *:focus {
+    outline: 2px solid #0066cc !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* Edge/IE focus outline fix */
+@supports (-ms-ime-align: auto) {
+  .keyboard-navigation *:focus {
+    outline: 2px solid #0066cc !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* =============================================================================
+   ACCESSIBILITY TESTING HELPERS
+   ============================================================================= */
+
+/* Highlight elements with accessibility issues (for testing) */
+.a11y-error {
+  outline: 3px solid #ff0000 !important;
+  outline-offset: 2px !important;
+}
+
+.a11y-warning {
+  outline: 2px solid #ff9800 !important;
+  outline-offset: 2px !important;
+}
+
+.a11y-info {
+  outline: 1px solid #2196f3 !important;
+  outline-offset: 1px !important;
+}
+
+/* Show element roles (for testing) */
+.show-roles *[role]::before {
+  content: attr(role);
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: #000000;
+  color: #ffffff;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 2px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* Show ARIA labels (for testing) */
+.show-aria *[aria-label]::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  background: #333333;
+  color: #ffffff;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 2px;
+  z-index: 10000;
+  pointer-events: none;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
