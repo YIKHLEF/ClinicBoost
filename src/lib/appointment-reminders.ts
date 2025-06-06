@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { sendSMS, sendWhatsApp, validatePhoneNumber, formatPhoneNumber } from '../utils/twilio';
+import { sendAppointmentReminder } from './email';
 import { handleError, logError } from './error-handling';
 import type { Database } from './database.types';
 
@@ -261,8 +262,25 @@ export class AppointmentReminderEngine {
           break;
 
         case 'email':
-          // Email sending would be implemented here
-          sendResult = { success: true, messageId: `email_${Date.now()}` };
+          if (!patient.email) {
+            throw new Error('Patient email address is required for email reminders');
+          }
+
+          const emailSuccess = await sendAppointmentReminder(patient.email, {
+            patientName: `${patient.first_name} ${patient.last_name}`,
+            appointmentDate: new Date(appointment.start_time),
+            doctorName: dentist ? `${dentist.first_name} ${dentist.last_name}` : 'your dentist',
+            treatmentType: appointment.title || 'Dental Appointment',
+            clinicName: 'ClinicBoost',
+            clinicAddress: 'Clinic Address', // Replace with actual clinic address
+            clinicPhone: '+212 5 22 XX XX XX', // Replace with actual clinic phone
+          });
+
+          sendResult = {
+            success: emailSuccess,
+            messageId: emailSuccess ? `email_${Date.now()}` : undefined,
+            error: emailSuccess ? undefined : 'Failed to send email reminder'
+          };
           break;
 
         default:

@@ -753,12 +753,40 @@ class UserManagementService {
    * Send welcome email to new user
    */
   private async sendWelcomeEmail(user: User, temporaryPassword?: string): Promise<void> {
-    // In a real implementation, this would send an actual email
-    logger.info('Welcome email sent', 'user-management', {
-      userId: user.id,
-      email: user.email,
-      hasTemporaryPassword: !!temporaryPassword,
-    });
+    try {
+      const { sendWelcomeEmail } = await import('../email');
+
+      const emailSent = await sendWelcomeEmail(user.email, {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        patientId: user.id,
+        temporaryPassword,
+        portalUrl: `${window.location.origin}/login`,
+        clinicName: 'ClinicBoost',
+        clinicPhone: '+212 5 22 XX XX XX',
+        clinicEmail: 'support@clinicboost.com',
+      });
+
+      if (emailSent) {
+        logger.info('Welcome email sent successfully', 'user-management', {
+          userId: user.id,
+          email: user.email,
+          hasTemporaryPassword: !!temporaryPassword,
+        });
+      } else {
+        logger.warn('Failed to send welcome email', 'user-management', {
+          userId: user.id,
+          email: user.email,
+        });
+      }
+    } catch (error: any) {
+      logger.error('Error sending welcome email', 'user-management', {
+        userId: user.id,
+        email: user.email,
+        error: error.message,
+      });
+    }
   }
 
   /**

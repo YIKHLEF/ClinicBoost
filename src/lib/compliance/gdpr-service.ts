@@ -692,8 +692,47 @@ export class GDPRService {
    * Private helper methods
    */
   private async sendVerificationEmail(email: string, token: string): Promise<void> {
-    // TODO: Implement email service integration
-    logger.info('Verification email sent', 'gdpr-service', { email, token });
+    try {
+      const { getEmailService } = await import('../email');
+      const emailService = getEmailService();
+
+      const verificationUrl = `${window.location.origin}/verify-email?token=${token}`;
+
+      const result = await emailService.sendEmail({
+        to: email,
+        subject: 'Email Verification - ClinicBoost',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Email Verification Required</h2>
+            <p>Please click the link below to verify your email address:</p>
+            <p><a href="${verificationUrl}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Verify Email</a></p>
+            <p>If you didn't request this verification, please ignore this email.</p>
+            <p>This link will expire in 24 hours.</p>
+            <p>Best regards,<br>ClinicBoost Team</p>
+          </div>
+        `,
+        text: `Please verify your email address by visiting: ${verificationUrl}`,
+        tags: ['email-verification'],
+        metadata: { token, email },
+      });
+
+      if (result.success) {
+        logger.info('Verification email sent successfully', 'gdpr-service', {
+          email,
+          messageId: result.messageId
+        });
+      } else {
+        logger.error('Failed to send verification email', 'gdpr-service', {
+          email,
+          error: result.error
+        });
+      }
+    } catch (error: any) {
+      logger.error('Error sending verification email', 'gdpr-service', {
+        email,
+        error: error.message
+      });
+    }
   }
 
   private anonymizeExportData(data: any): any {
