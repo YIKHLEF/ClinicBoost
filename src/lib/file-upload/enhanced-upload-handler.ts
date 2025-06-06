@@ -543,4 +543,213 @@ export class EnhancedUploadHandler {
   private async finalizeUpload(job: UploadJob): Promise<void> {
     // Implementation would finalize upload on server
   }
+
+  /**
+   * Enhanced upload with comprehensive error recovery
+   */
+  async uploadWithRecovery(
+    file: File,
+    uploadUrl: string,
+    options: {
+      onProgress?: (progress: UploadProgress) => void;
+      onError?: (error: Error, canRetry: boolean) => void;
+      onRecovery?: (recoveryInfo: { resumeToken: string; uploadedBytes: number }) => void;
+      metadata?: Record<string, any>;
+      resumeToken?: string;
+      maxRetries?: number;
+      retryDelay?: number;
+    } = {}
+  ): Promise<{ success: boolean; jobId?: string; error?: Error; resumeToken?: string }> {
+    const {
+      maxRetries = 3,
+      retryDelay = 2000,
+      onProgress,
+      onError,
+      onRecovery
+    } = options;
+
+    let lastError: Error;
+    let resumeToken = options.resumeToken;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const jobId = await this.startUpload(file, uploadUrl, {
+          onProgress,
+          metadata: options.metadata,
+          resumeToken
+        });
+
+        return { success: true, jobId };
+
+      } catch (error) {
+        lastError = error as Error;
+
+        logger.warn('Upload attempt failed', 'enhanced-upload-handler', {
+          attempt: attempt + 1,
+          maxRetries,
+          error: lastError.message,
+          fileName: file.name
+        });
+
+        // Check if error is recoverable
+        const isRecoverable = this.isRecoverableError(lastError);
+
+        if (onError) {
+          onError(lastError, isRecoverable && attempt < maxRetries - 1);
+        }
+
+        // If not recoverable or last attempt, break
+        if (!isRecoverable || attempt === maxRetries - 1) {
+          break;
+        }
+
+        // Try to get resume information
+        try {
+          const recoveryInfo = await this.getUploadRecoveryInfo(file, uploadUrl);
+          if (recoveryInfo) {
+            resumeToken = recoveryInfo.resumeToken;
+            if (onRecovery) {
+              onRecovery(recoveryInfo);
+            }
+          }
+        } catch (recoveryError) {
+          logger.warn('Failed to get recovery info', 'enhanced-upload-handler', {
+            error: recoveryError
+          });
+        }
+
+        // Wait before retrying
+        if (attempt < maxRetries - 1) {
+          await this.delay(retryDelay * Math.pow(2, attempt));
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: lastError!,
+      resumeToken
+    };
+  }
+
+  /**
+   * Check if upload error is recoverable
+   */
+  private isRecoverableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+
+    // Network errors are usually recoverable
+    if (message.includes('network') || message.includes('timeout') ||
+        message.includes('connection') || message.includes('abort')) {
+      return true;
+    }
+
+    // Server errors (5xx) are recoverable
+    if (message.includes('500') || message.includes('502') ||
+        message.includes('503') || message.includes('504')) {
+      return true;
+    }
+
+    // Rate limit errors are recoverable
+    if (message.includes('rate limit') || message.includes('429')) {
+      return true;
+    }
+
+    // Client errors (4xx) are usually not recoverable
+    if (message.includes('400') || message.includes('401') ||
+        message.includes('403') || message.includes('404') ||
+        message.includes('413') || message.includes('415')) {
+      return false;
+    }
+
+    return true; // Default to recoverable for unknown errors
+  }
+
+  /**
+   * Get upload recovery information
+   */
+  private async getUploadRecoveryInfo(
+    file: File,
+    uploadUrl: string
+  ): Promise<{ resumeToken: string; uploadedBytes: number } | null> {
+    try {
+      // Check if there's a partial upload stored locally
+      const storageKey = `upload_${this.generateFileHash(file)}`;
+      const storedInfo = localStorage.getItem(storageKey);
+
+      if (storedInfo) {
+        const parsed = JSON.parse(storedInfo);
+
+        // Verify the upload is still valid on the server
+        const isValid = await this.verifyPartialUpload(uploadUrl, parsed.resumeToken);
+
+        if (isValid) {
+          return parsed;
+        } else {
+          // Clean up invalid stored info
+          localStorage.removeItem(storageKey);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn('Failed to get upload recovery info', 'enhanced-upload-handler', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Verify if partial upload is still valid
+   */
+  private async verifyPartialUpload(uploadUrl: string, resumeToken: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${uploadUrl}/verify`, {
+        method: 'HEAD',
+        headers: {
+          'Upload-Resume-Token': resumeToken
+        }
+      });
+
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Generate file hash for storage key
+   */
+  private generateFileHash(file: File): string {
+    return btoa(`${file.name}_${file.size}_${file.lastModified}`).replace(/[^a-zA-Z0-9]/g, '');
+  }
+
+  /**
+   * Store upload progress for recovery
+   */
+  storeUploadProgress(file: File, resumeToken: string, uploadedBytes: number): void {
+    try {
+      const storageKey = `upload_${this.generateFileHash(file)}`;
+      const info = {
+        resumeToken,
+        uploadedBytes,
+        timestamp: Date.now()
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(info));
+    } catch (error) {
+      logger.warn('Failed to store upload progress', 'enhanced-upload-handler', { error });
+    }
+  }
+
+  /**
+   * Clean up stored upload progress
+   */
+  cleanupUploadProgress(file: File): void {
+    try {
+      const storageKey = `upload_${this.generateFileHash(file)}`;
+      localStorage.removeItem(storageKey);
+    } catch (error) {
+      logger.warn('Failed to cleanup upload progress', 'enhanced-upload-handler', { error });
+    }
+  }
 }

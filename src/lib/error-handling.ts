@@ -657,3 +657,20 @@ class ErrorMonitor {
 }
 
 export const errorMonitor = new ErrorMonitor();
+
+// Export enhanced error handling components
+export { integrationErrorHandler } from './error-handling/integration-errors';
+export { EnhancedNetworkHandler } from './error-handling/enhanced-network-handling';
+
+// Export enhanced service components
+export { enhancedSupabase, supabaseQuery, supabaseMutate, supabaseAuth } from './supabase/enhanced-client';
+export { EnhancedUploadHandler } from './file-upload/enhanced-upload-handler';
+export { enhancedPaymentProcessor, EnhancedPaymentProcessor } from './payment/enhanced-payment-processor';
+export { enhancedSyncService, EnhancedSyncService } from './offline/enhanced-sync-service';
+export {
+  enhancedServiceWrapper,
+  executeStripeOperation,
+  executeTwilioOperation,
+  executeAzureAIOperation,
+  executeUploadOperation
+} from './integrations/enhanced-service-wrapper';
