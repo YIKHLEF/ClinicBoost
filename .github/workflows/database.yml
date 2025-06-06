@@ -1,0 +1,291 @@
+name: Database Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Database operation to perform'
+        required: true
+        default: 'migrate'
+        type: choice
+        options:
+          - migrate
+          - rollback
+          - seed
+          - backup
+          - restore
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      migration_version:
+        description: 'Migration version (for rollback)'
+        required: false
+        type: string
+      backup_file:
+        description: 'Backup file name (for restore)'
+        required: false
+        type: string
+
+env:
+  POSTGRES_USER: postgres
+  POSTGRES_DB_STAGING: clinicboost_staging
+  POSTGRES_DB_PRODUCTION: clinicboost_production
+
+jobs:
+  validate-inputs:
+    name: Validate Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      operation: ${{ steps.validate.outputs.operation }}
+      environment: ${{ steps.validate.outputs.environment }}
+      migration_version: ${{ steps.validate.outputs.migration_version }}
+      backup_file: ${{ steps.validate.outputs.backup_file }}
+    
+    steps:
+      - name: Validate inputs
+        id: validate
+        run: |
+          echo "operation=${{ github.event.inputs.operation }}" >> $GITHUB_OUTPUT
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "migration_version=${{ github.event.inputs.migration_version }}" >> $GITHUB_OUTPUT
+          echo "backup_file=${{ github.event.inputs.backup_file }}" >> $GITHUB_OUTPUT
+          
+          # Validate required inputs for specific operations
+          if [[ "${{ github.event.inputs.operation }}" == "rollback" && -z "${{ github.event.inputs.migration_version }}" ]]; then
+            echo "Error: Migration version is required for rollback operation"
+            exit 1
+          fi
+          
+          if [[ "${{ github.event.inputs.operation }}" == "restore" && -z "${{ github.event.inputs.backup_file }}" ]]; then
+            echo "Error: Backup file is required for restore operation"
+            exit 1
+          fi
+
+  database-migrate:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    if: needs.validate-inputs.outputs.operation == 'migrate'
+    environment: ${{ needs.validate-inputs.outputs.environment }}
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run database migrations
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Running migrations for ${{ needs.validate-inputs.outputs.environment }} environment..."
+          npm run db:migrate
+        env:
+          NODE_ENV: ${{ needs.validate-inputs.outputs.environment }}
+      
+      - name: Verify migration
+        run: |
+          echo "Verifying migration completed successfully..."
+          npm run db:status
+
+  database-rollback:
+    name: Database Rollback
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    if: needs.validate-inputs.outputs.operation == 'rollback'
+    environment: ${{ needs.validate-inputs.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Create backup before rollback
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Creating backup before rollback..."
+          npm run db:backup -- --name "pre-rollback-$(date +%Y%m%d-%H%M%S)"
+      
+      - name: Rollback database
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Rolling back to version ${{ needs.validate-inputs.outputs.migration_version }}..."
+          npm run db:rollback -- --to ${{ needs.validate-inputs.outputs.migration_version }}
+
+  database-seed:
+    name: Database Seeding
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    if: needs.validate-inputs.outputs.operation == 'seed'
+    environment: ${{ needs.validate-inputs.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Seed database
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Seeding database for ${{ needs.validate-inputs.outputs.environment }} environment..."
+          npm run db:seed
+
+  database-backup:
+    name: Database Backup
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    if: needs.validate-inputs.outputs.operation == 'backup'
+    environment: ${{ needs.validate-inputs.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Create database backup
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          BACKUP_NAME="manual-backup-$(date +%Y%m%d-%H%M%S)"
+          echo "Creating backup: $BACKUP_NAME"
+          npm run db:backup -- --name "$BACKUP_NAME"
+      
+      - name: Upload backup to cloud storage
+        run: |
+          echo "Uploading backup to cloud storage..."
+          # Add cloud storage upload logic here
+
+  database-restore:
+    name: Database Restore
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    if: needs.validate-inputs.outputs.operation == 'restore'
+    environment: ${{ needs.validate-inputs.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Create backup before restore
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Creating backup before restore..."
+          npm run db:backup -- --name "pre-restore-$(date +%Y%m%d-%H%M%S)"
+      
+      - name: Restore database
+        run: |
+          if [[ "${{ needs.validate-inputs.outputs.environment }}" == "staging" ]]; then
+            export DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+          else
+            export DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          echo "Restoring from backup: ${{ needs.validate-inputs.outputs.backup_file }}"
+          npm run db:restore -- --file "${{ needs.validate-inputs.outputs.backup_file }}"
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [validate-inputs, database-migrate, database-rollback, database-seed, database-backup, database-restore]
+    if: always()
+    
+    steps:
+      - name: Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#database-ops'
+          text: |
+            Database operation completed:
+            - Operation: ${{ needs.validate-inputs.outputs.operation }}
+            - Environment: ${{ needs.validate-inputs.outputs.environment }}
+            - Status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.DATABASE_SLACK_WEBHOOK_URL }}

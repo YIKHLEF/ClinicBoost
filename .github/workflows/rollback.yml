@@ -1,0 +1,327 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      rollback_type:
+        description: 'Type of rollback'
+        required: true
+        default: 'application'
+        type: choice
+        options:
+          - application
+          - database
+          - full
+      target_version:
+        description: 'Target version/commit to rollback to'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-rollback:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.validate.outputs.environment }}
+      rollback_type: ${{ steps.validate.outputs.rollback_type }}
+      target_version: ${{ steps.validate.outputs.target_version }}
+      reason: ${{ steps.validate.outputs.reason }}
+      approved: ${{ steps.validate.outputs.approved }}
+    
+    steps:
+      - name: Validate inputs
+        id: validate
+        run: |
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "rollback_type=${{ github.event.inputs.rollback_type }}" >> $GITHUB_OUTPUT
+          echo "target_version=${{ github.event.inputs.target_version }}" >> $GITHUB_OUTPUT
+          echo "reason=${{ github.event.inputs.reason }}" >> $GITHUB_OUTPUT
+          
+          # Auto-approve for staging, require manual approval for production
+          if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            echo "approved=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Notify rollback initiation
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "channel": "#deployments",
+              "text": "🔄 Rollback initiated",
+              "attachments": [
+                {
+                  "color": "warning",
+                  "fields": [
+                    {
+                      "title": "Environment",
+                      "value": "${{ github.event.inputs.environment }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Type",
+                      "value": "${{ github.event.inputs.rollback_type }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Target Version",
+                      "value": "${{ github.event.inputs.target_version || 'Previous stable' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Reason",
+                      "value": "${{ github.event.inputs.reason }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Initiated by",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  production-approval:
+    name: Production Rollback Approval
+    runs-on: ubuntu-latest
+    needs: validate-rollback
+    if: needs.validate-rollback.outputs.environment == 'production'
+    environment: production-rollback
+    
+    steps:
+      - name: Manual approval required
+        run: |
+          echo "Production rollback requires manual approval"
+          echo "Reason: ${{ needs.validate-rollback.outputs.reason }}"
+          echo "Target: ${{ needs.validate-rollback.outputs.target_version }}"
+
+  pre-rollback-backup:
+    name: Pre-Rollback Backup
+    runs-on: ubuntu-latest
+    needs: [validate-rollback, production-approval]
+    if: always() && (needs.validate-rollback.outputs.approved == 'true' || needs.production-approval.result == 'success')
+    
+    steps:
+      - name: Create emergency backup
+        run: |
+          echo "Creating emergency backup before rollback..."
+          
+          # Trigger database backup
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/database.yml/dispatches" \
+            -d '{
+              "ref": "main",
+              "inputs": {
+                "operation": "backup",
+                "environment": "${{ needs.validate-rollback.outputs.environment }}"
+              }
+            }'
+          
+          # Wait for backup to complete
+          sleep 180
+      
+      - name: Verify backup completion
+        run: |
+          echo "Verifying backup completion..."
+          # Add backup verification logic here
+
+  application-rollback:
+    name: Application Rollback
+    runs-on: ubuntu-latest
+    needs: [validate-rollback, production-approval, pre-rollback-backup]
+    if: always() && (needs.validate-rollback.outputs.rollback_type == 'application' || needs.validate-rollback.outputs.rollback_type == 'full') && (needs.validate-rollback.outputs.approved == 'true' || needs.production-approval.result == 'success')
+    environment: ${{ needs.validate-rollback.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-rollback.outputs.target_version || 'HEAD~1' }}
+      
+      - name: Setup deployment tools
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+      
+      - name: Get rollback target
+        id: target
+        run: |
+          if [[ -n "${{ needs.validate-rollback.outputs.target_version }}" ]]; then
+            TARGET_VERSION="${{ needs.validate-rollback.outputs.target_version }}"
+          else
+            # Get previous stable version
+            TARGET_VERSION=$(git log --oneline -n 2 | tail -n 1 | cut -d' ' -f1)
+          fi
+          
+          echo "target_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+          echo "Rollback target: $TARGET_VERSION"
+      
+      - name: Rollback application
+        run: |
+          ENV="${{ needs.validate-rollback.outputs.environment }}"
+          TARGET="${{ steps.target.outputs.target_version }}"
+          
+          echo "Rolling back $ENV to $TARGET..."
+          
+          if [[ "$ENV" == "staging" ]]; then
+            COMPOSE_FILE="docker-compose.staging.yml"
+            IMAGE_TAG="staging"
+          else
+            COMPOSE_FILE="docker-compose.production.yml"
+            IMAGE_TAG="production"
+          fi
+          
+          # Pull the target image
+          docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TARGET" || \
+          docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG"
+          
+          # Update docker-compose to use target version
+          sed -i "s|image: .*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TARGET|g" $COMPOSE_FILE
+          
+          # Deploy rollback version
+          docker-compose -f $COMPOSE_FILE down
+          docker-compose -f $COMPOSE_FILE up -d
+          
+          # Wait for services to be ready
+          sleep 60
+        env:
+          POSTGRES_PASSWORD: ${{ needs.validate-rollback.outputs.environment == 'staging' && secrets.STAGING_POSTGRES_PASSWORD || secrets.PRODUCTION_POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ needs.validate-rollback.outputs.environment == 'staging' && secrets.STAGING_REDIS_PASSWORD || secrets.PRODUCTION_REDIS_PASSWORD }}
+      
+      - name: Verify rollback
+        run: |
+          ENV="${{ needs.validate-rollback.outputs.environment }}"
+          
+          if [[ "$ENV" == "staging" ]]; then
+            BASE_URL="https://staging.clinicboost.com"
+            API_URL="https://staging-api.clinicboost.com"
+          else
+            BASE_URL="https://app.clinicboost.com"
+            API_URL="https://api.clinicboost.com"
+          fi
+          
+          echo "Verifying rollback for $ENV..."
+          
+          # Health checks
+          curl -f "$BASE_URL/health" || exit 1
+          curl -f "$API_URL/api/health" || exit 1
+          
+          echo "Rollback verification successful"
+
+  database-rollback:
+    name: Database Rollback
+    runs-on: ubuntu-latest
+    needs: [validate-rollback, production-approval, pre-rollback-backup]
+    if: always() && (needs.validate-rollback.outputs.rollback_type == 'database' || needs.validate-rollback.outputs.rollback_type == 'full') && (needs.validate-rollback.outputs.approved == 'true' || needs.production-approval.result == 'success')
+    environment: ${{ needs.validate-rollback.outputs.environment }}
+    
+    steps:
+      - name: Database rollback
+        run: |
+          echo "Initiating database rollback..."
+          
+          # Trigger database rollback
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/database.yml/dispatches" \
+            -d '{
+              "ref": "main",
+              "inputs": {
+                "operation": "rollback",
+                "environment": "${{ needs.validate-rollback.outputs.environment }}",
+                "migration_version": "${{ needs.validate-rollback.outputs.target_version }}"
+              }
+            }'
+          
+          # Wait for rollback to complete
+          sleep 300
+
+  post-rollback-verification:
+    name: Post-Rollback Verification
+    runs-on: ubuntu-latest
+    needs: [validate-rollback, application-rollback, database-rollback]
+    if: always() && (needs.application-rollback.result == 'success' || needs.database-rollback.result == 'success')
+    
+    steps:
+      - name: Comprehensive health check
+        run: |
+          ENV="${{ needs.validate-rollback.outputs.environment }}"
+          
+          if [[ "$ENV" == "staging" ]]; then
+            BASE_URL="https://staging.clinicboost.com"
+            API_URL="https://staging-api.clinicboost.com"
+          else
+            BASE_URL="https://app.clinicboost.com"
+            API_URL="https://api.clinicboost.com"
+          fi
+          
+          echo "Running comprehensive health check..."
+          
+          # Application health
+          curl -f "$BASE_URL/health" || exit 1
+          
+          # API health
+          curl -f "$API_URL/api/health" || exit 1
+          
+          # Database health
+          curl -f "$API_URL/api/health/database" || exit 1
+          
+          echo "All health checks passed"
+      
+      - name: Notify rollback completion
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: |
+            ✅ Rollback completed successfully
+            - Environment: ${{ needs.validate-rollback.outputs.environment }}
+            - Type: ${{ needs.validate-rollback.outputs.rollback_type }}
+            - Target: ${{ needs.validate-rollback.outputs.target_version || 'Previous stable' }}
+            - Reason: ${{ needs.validate-rollback.outputs.reason }}
+            - Completed by: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Notify rollback failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#deployments'
+          text: |
+            🚨 Rollback failed
+            - Environment: ${{ needs.validate-rollback.outputs.environment }}
+            - Type: ${{ needs.validate-rollback.outputs.rollback_type }}
+            - Reason: ${{ needs.validate-rollback.outputs.reason }}
+            - Manual intervention required
+            - Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

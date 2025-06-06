@@ -1,0 +1,314 @@
+name: Monitoring & Alerting
+
+on:
+  schedule:
+    # Run health checks every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to monitor'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+          - all
+      check_type:
+        description: 'Type of check to run'
+        required: true
+        default: 'health'
+        type: choice
+        options:
+          - health
+          - performance
+          - security
+          - all
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'health' || github.event.inputs.check_type == 'all' || github.event_name == 'schedule'
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event.inputs.environment == 'all' && fromJson('["staging", "production"]') || fromJson(format('["{0}"]', github.event.inputs.environment || 'production')) }}
+    
+    steps:
+      - name: Health Check - ${{ matrix.environment }}
+        run: |
+          if [[ "${{ matrix.environment }}" == "staging" ]]; then
+            BASE_URL="https://staging.clinicboost.com"
+            API_URL="https://staging-api.clinicboost.com"
+          else
+            BASE_URL="https://app.clinicboost.com"
+            API_URL="https://api.clinicboost.com"
+          fi
+          
+          echo "Checking health for ${{ matrix.environment }} environment..."
+          
+          # Application health check
+          APP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/health" || echo "000")
+          
+          # API health check
+          API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" || echo "000")
+          
+          # Database health check
+          DB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health/database" || echo "000")
+          
+          echo "App Status: $APP_STATUS"
+          echo "API Status: $API_STATUS"
+          echo "DB Status: $DB_STATUS"
+          
+          # Check if all services are healthy
+          if [[ "$APP_STATUS" != "200" || "$API_STATUS" != "200" || "$DB_STATUS" != "200" ]]; then
+            echo "Health check failed for ${{ matrix.environment }}"
+            echo "APP_HEALTHY=false" >> $GITHUB_ENV
+            exit 1
+          else
+            echo "All services healthy for ${{ matrix.environment }}"
+            echo "APP_HEALTHY=true" >> $GITHUB_ENV
+          fi
+      
+      - name: Alert on health check failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: |
+            🚨 Health check failed for ${{ matrix.environment }}
+            - Environment: ${{ matrix.environment }}
+            - Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+            - Check the services immediately
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.MONITORING_SLACK_WEBHOOK_URL }}
+
+  performance-check:
+    name: Performance Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'performance' || github.event.inputs.check_type == 'all'
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event.inputs.environment == 'all' && fromJson('["staging", "production"]') || fromJson(format('["{0}"]', github.event.inputs.environment || 'production')) }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run performance tests
+        run: |
+          if [[ "${{ matrix.environment }}" == "staging" ]]; then
+            BASE_URL="https://staging.clinicboost.com"
+          else
+            BASE_URL="https://app.clinicboost.com"
+          fi
+          
+          echo "Running performance tests for ${{ matrix.environment }}..."
+          
+          # Run Lighthouse audit
+          npm install -g lighthouse
+          lighthouse "$BASE_URL" \
+            --output=json \
+            --output-path=./lighthouse-${{ matrix.environment }}.json \
+            --chrome-flags="--headless --no-sandbox"
+          
+          # Extract performance score
+          PERFORMANCE_SCORE=$(cat lighthouse-${{ matrix.environment }}.json | jq '.categories.performance.score * 100')
+          echo "Performance Score: $PERFORMANCE_SCORE"
+          
+          # Check if performance is below threshold
+          if (( $(echo "$PERFORMANCE_SCORE < 80" | bc -l) )); then
+            echo "Performance below threshold: $PERFORMANCE_SCORE"
+            echo "PERFORMANCE_ALERT=true" >> $GITHUB_ENV
+          fi
+      
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results-${{ matrix.environment }}
+          path: lighthouse-${{ matrix.environment }}.json
+      
+      - name: Alert on performance degradation
+        if: env.PERFORMANCE_ALERT == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "channel": "#performance",
+              "text": "⚠️ Performance degradation detected",
+              "attachments": [
+                {
+                  "color": "warning",
+                  "fields": [
+                    {
+                      "title": "Environment",
+                      "value": "${{ matrix.environment }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Performance Score",
+                      "value": "${{ env.PERFORMANCE_SCORE }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.MONITORING_SLACK_WEBHOOK_URL }}
+
+  security-check:
+    name: Security Monitoring
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'security' || github.event.inputs.check_type == 'all'
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event.inputs.environment == 'all' && fromJson('["staging", "production"]') || fromJson(format('["{0}"]', github.event.inputs.environment || 'production')) }}
+    
+    steps:
+      - name: SSL Certificate Check
+        run: |
+          if [[ "${{ matrix.environment }}" == "staging" ]]; then
+            DOMAIN="staging.clinicboost.com"
+          else
+            DOMAIN="app.clinicboost.com"
+          fi
+          
+          echo "Checking SSL certificate for $DOMAIN..."
+          
+          # Check SSL certificate expiry
+          EXPIRY_DATE=$(echo | openssl s_client -servername "$DOMAIN" -connect "$DOMAIN:443" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          EXPIRY_TIMESTAMP=$(date -d "$EXPIRY_DATE" +%s)
+          CURRENT_TIMESTAMP=$(date +%s)
+          DAYS_UNTIL_EXPIRY=$(( (EXPIRY_TIMESTAMP - CURRENT_TIMESTAMP) / 86400 ))
+          
+          echo "SSL certificate expires in $DAYS_UNTIL_EXPIRY days"
+          
+          if [[ $DAYS_UNTIL_EXPIRY -lt 30 ]]; then
+            echo "SSL certificate expires soon: $DAYS_UNTIL_EXPIRY days"
+            echo "SSL_ALERT=true" >> $GITHUB_ENV
+            echo "DAYS_UNTIL_EXPIRY=$DAYS_UNTIL_EXPIRY" >> $GITHUB_ENV
+          fi
+      
+      - name: Security Headers Check
+        run: |
+          if [[ "${{ matrix.environment }}" == "staging" ]]; then
+            BASE_URL="https://staging.clinicboost.com"
+          else
+            BASE_URL="https://app.clinicboost.com"
+          fi
+          
+          echo "Checking security headers for ${{ matrix.environment }}..."
+          
+          # Check for security headers
+          HEADERS=$(curl -s -I "$BASE_URL")
+          
+          MISSING_HEADERS=()
+          
+          if ! echo "$HEADERS" | grep -i "strict-transport-security" > /dev/null; then
+            MISSING_HEADERS+=("Strict-Transport-Security")
+          fi
+          
+          if ! echo "$HEADERS" | grep -i "x-content-type-options" > /dev/null; then
+            MISSING_HEADERS+=("X-Content-Type-Options")
+          fi
+          
+          if ! echo "$HEADERS" | grep -i "x-frame-options" > /dev/null; then
+            MISSING_HEADERS+=("X-Frame-Options")
+          fi
+          
+          if [[ ${#MISSING_HEADERS[@]} -gt 0 ]]; then
+            echo "Missing security headers: ${MISSING_HEADERS[*]}"
+            echo "SECURITY_HEADERS_ALERT=true" >> $GITHUB_ENV
+          fi
+      
+      - name: Alert on SSL expiry
+        if: env.SSL_ALERT == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "channel": "#security",
+              "text": "🔒 SSL Certificate expiring soon",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Environment",
+                      "value": "${{ matrix.environment }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Days Until Expiry",
+                      "value": "${{ env.DAYS_UNTIL_EXPIRY }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+
+  uptime-check:
+    name: Uptime Monitoring
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Check uptime
+        run: |
+          # Check multiple endpoints
+          ENDPOINTS=(
+            "https://app.clinicboost.com"
+            "https://api.clinicboost.com/api/health"
+            "https://staging.clinicboost.com"
+            "https://staging-api.clinicboost.com/api/health"
+          )
+          
+          FAILED_ENDPOINTS=()
+          
+          for endpoint in "${ENDPOINTS[@]}"; do
+            echo "Checking $endpoint..."
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$endpoint" || echo "000")
+            
+            if [[ "$STATUS" != "200" ]]; then
+              FAILED_ENDPOINTS+=("$endpoint (Status: $STATUS)")
+            fi
+          done
+          
+          if [[ ${#FAILED_ENDPOINTS[@]} -gt 0 ]]; then
+            echo "Failed endpoints: ${FAILED_ENDPOINTS[*]}"
+            echo "UPTIME_ALERT=true" >> $GITHUB_ENV
+            echo "FAILED_ENDPOINTS=${FAILED_ENDPOINTS[*]}" >> $GITHUB_ENV
+          fi
+      
+      - name: Alert on downtime
+        if: env.UPTIME_ALERT == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: |
+            🚨 Service downtime detected
+            Failed endpoints: ${{ env.FAILED_ENDPOINTS }}
+            Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.MONITORING_SLACK_WEBHOOK_URL }}
