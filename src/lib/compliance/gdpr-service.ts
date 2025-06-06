@@ -690,6 +690,234 @@ export class GDPRService {
   }
 
   /**
+   * Get enhanced data subject request metrics for dashboard
+   */
+  async getEnhancedDataSubjectMetrics(): Promise<{
+    overview: {
+      total: number;
+      pending: number;
+      completed: number;
+      overdue: number;
+      avgProcessingTime: number;
+      complianceRate: number;
+    };
+    trends: {
+      requestsByMonth: Array<{ month: string; count: number; type: string }>;
+      processingTimes: Array<{ month: string; avgDays: number }>;
+      complianceDeadlines: Array<{ month: string; onTime: number; overdue: number }>;
+    };
+    breakdown: {
+      byType: Record<string, number>;
+      byStatus: Record<string, number>;
+      byRegion: Record<string, number>;
+    };
+    performance: {
+      responseTimeP50: number;
+      responseTimeP95: number;
+      completionRate: number;
+      escalationRate: number;
+    };
+  }> {
+    try {
+      // Get all requests with detailed information
+      const { data: allRequests, error } = await supabase
+        .from('data_subject_requests')
+        .select(`
+          *,
+          processed_at,
+          created_at,
+          due_date,
+          status,
+          request_type
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const now = new Date();
+      const requests = allRequests || [];
+
+      // Calculate overview metrics
+      const pending = requests.filter(r => r.status === 'pending').length;
+      const completed = requests.filter(r => r.status === 'completed').length;
+      const overdue = requests.filter(r =>
+        r.status === 'pending' && new Date(r.due_date) < now
+      ).length;
+
+      // Calculate average processing time
+      const completedRequests = requests.filter(r => r.status === 'completed' && r.processed_at);
+      const avgProcessingTime = completedRequests.length > 0
+        ? completedRequests.reduce((sum, req) => {
+            const created = new Date(req.created_at);
+            const processed = new Date(req.processed_at);
+            return sum + (processed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+          }, 0) / completedRequests.length
+        : 0;
+
+      // Calculate compliance rate (completed within 30 days)
+      const onTimeCompletions = completedRequests.filter(req => {
+        const created = new Date(req.created_at);
+        const processed = new Date(req.processed_at);
+        const daysDiff = (processed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+        return daysDiff <= 30;
+      }).length;
+      const complianceRate = completedRequests.length > 0
+        ? (onTimeCompletions / completedRequests.length) * 100
+        : 100;
+
+      // Generate trends data (last 12 months)
+      const monthlyData = this.generateMonthlyTrends(requests);
+
+      // Calculate breakdown statistics
+      const byType = requests.reduce((acc, req) => {
+        acc[req.request_type] = (acc[req.request_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const byStatus = requests.reduce((acc, req) => {
+        acc[req.status] = (acc[req.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Calculate performance metrics
+      const processingTimes = completedRequests.map(req => {
+        const created = new Date(req.created_at);
+        const processed = new Date(req.processed_at);
+        return (processed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+      }).sort((a, b) => a - b);
+
+      const responseTimeP50 = processingTimes.length > 0
+        ? processingTimes[Math.floor(processingTimes.length * 0.5)]
+        : 0;
+      const responseTimeP95 = processingTimes.length > 0
+        ? processingTimes[Math.floor(processingTimes.length * 0.95)]
+        : 0;
+
+      const completionRate = requests.length > 0
+        ? (completed / requests.length) * 100
+        : 0;
+
+      const escalationRate = requests.filter(r =>
+        r.status === 'pending' &&
+        (new Date().getTime() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24) > 20
+      ).length / Math.max(requests.length, 1) * 100;
+
+      return {
+        overview: {
+          total: requests.length,
+          pending,
+          completed,
+          overdue,
+          avgProcessingTime,
+          complianceRate
+        },
+        trends: monthlyData,
+        breakdown: {
+          byType,
+          byStatus,
+          byRegion: { 'EU': requests.length } // Simplified for demo
+        },
+        performance: {
+          responseTimeP50,
+          responseTimeP95,
+          completionRate,
+          escalationRate
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get enhanced data subject metrics', 'gdpr-service', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate monthly trends data for the last 12 months
+   */
+  private generateMonthlyTrends(requests: any[]): {
+    requestsByMonth: Array<{ month: string; count: number; type: string }>;
+    processingTimes: Array<{ month: string; avgDays: number }>;
+    complianceDeadlines: Array<{ month: string; onTime: number; overdue: number }>;
+  } {
+    const now = new Date();
+    const months = [];
+
+    // Generate last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      });
+    }
+
+    const requestsByMonth: Array<{ month: string; count: number; type: string }> = [];
+    const processingTimes: Array<{ month: string; avgDays: number }> = [];
+    const complianceDeadlines: Array<{ month: string; onTime: number; overdue: number }> = [];
+
+    months.forEach(month => {
+      const monthRequests = requests.filter(req => {
+        const reqDate = new Date(req.created_at);
+        const reqKey = `${reqDate.getFullYear()}-${String(reqDate.getMonth() + 1).padStart(2, '0')}`;
+        return reqKey === month.key;
+      });
+
+      // Requests by type for this month
+      const typeBreakdown = monthRequests.reduce((acc, req) => {
+        acc[req.request_type] = (acc[req.request_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      Object.entries(typeBreakdown).forEach(([type, count]) => {
+        requestsByMonth.push({
+          month: month.label,
+          count,
+          type
+        });
+      });
+
+      // Processing times for completed requests this month
+      const completedThisMonth = monthRequests.filter(req =>
+        req.status === 'completed' && req.processed_at
+      );
+
+      const avgProcessingTime = completedThisMonth.length > 0
+        ? completedThisMonth.reduce((sum, req) => {
+            const created = new Date(req.created_at);
+            const processed = new Date(req.processed_at);
+            return sum + (processed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+          }, 0) / completedThisMonth.length
+        : 0;
+
+      processingTimes.push({
+        month: month.label,
+        avgDays: avgProcessingTime
+      });
+
+      // Compliance deadlines
+      const onTime = completedThisMonth.filter(req => {
+        const created = new Date(req.created_at);
+        const processed = new Date(req.processed_at);
+        const daysDiff = (processed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+        return daysDiff <= 30;
+      }).length;
+
+      const overdue = completedThisMonth.length - onTime;
+
+      complianceDeadlines.push({
+        month: month.label,
+        onTime,
+        overdue
+      });
+    });
+
+    return {
+      requestsByMonth,
+      processingTimes,
+      complianceDeadlines
+    };
+  }
+
+  /**
    * Private helper methods
    */
   private async sendVerificationEmail(email: string, token: string): Promise<void> {

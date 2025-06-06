@@ -464,6 +464,30 @@ export const ComplianceDashboard: React.FC = () => {
                 <div className="text-sm text-gray-600">{t('compliance.generateReportDesc', 'Create compliance reports')}</div>
               </div>
             </Button>
+
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 h-auto p-4"
+              onClick={() => window.location.hash = '#/compliance/gdpr-metrics'}
+            >
+              <BarChart3 className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-medium">{t('compliance.gdprMetrics', 'GDPR Metrics')}</div>
+                <div className="text-sm text-gray-600">{t('compliance.gdprMetricsDesc', 'View detailed GDPR analytics')}</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 h-auto p-4"
+              onClick={() => window.location.hash = '#/compliance/consent-workflows'}
+            >
+              <Settings className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-medium">{t('compliance.consentWorkflows', 'Consent Workflows')}</div>
+                <div className="text-sm text-gray-600">{t('compliance.consentWorkflowsDesc', 'Automate consent management')}</div>
+              </div>
+            </Button>
           </div>
         </CardContent>
       </Card>

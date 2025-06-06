@@ -31,7 +31,14 @@ export interface AnonymizedField {
 export class AnonymizationEngine {
   private readonly encryptionKey: string;
   private readonly saltKey: string;
-  
+  private anonymizationCache = new Map<string, any>();
+  private qualityMetrics = {
+    totalFields: 0,
+    anonymizedFields: 0,
+    techniques: new Set<string>(),
+    dataTypes: new Set<string>()
+  };
+
   constructor() {
     this.encryptionKey = secureConfig.getSecurityConfig().encryptionKey;
     this.saltKey = CryptoJS.lib.WordArray.random(256/8).toString();
@@ -400,8 +407,335 @@ export class AnonymizationEngine {
       techniques_applied: ['pseudonymization', 'generalization', 'redaction'],
       anonymization_version: '1.0'
     };
-    
+
     return obj;
+  }
+
+  /**
+   * Enhanced anonymization with k-anonymity
+   */
+  async anonymizeWithKAnonymity(
+    dataset: any[],
+    k: number = 3,
+    quasiIdentifiers: string[] = ['age_range', 'city', 'gender']
+  ): Promise<{
+    anonymizedData: any[];
+    qualityMetrics: {
+      kAnonymityLevel: number;
+      informationLoss: number;
+      dataUtility: number;
+    };
+  }> {
+    try {
+      logger.info('Starting k-anonymity anonymization', 'anonymization-utils', { k, quasiIdentifiers });
+
+      // Group records by quasi-identifier combinations
+      const groups = new Map<string, any[]>();
+
+      dataset.forEach(record => {
+        const key = quasiIdentifiers
+          .map(qi => record[qi] || 'unknown')
+          .join('|');
+
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key)!.push(record);
+      });
+
+      // Generalize groups that don't meet k-anonymity
+      const anonymizedData: any[] = [];
+      let totalInformationLoss = 0;
+      let groupsProcessed = 0;
+
+      for (const [key, records] of groups) {
+        if (records.length < k) {
+          // Generalize this group further
+          const generalizedRecords = records.map(record => {
+            const generalized = { ...record };
+
+            // Apply more aggressive generalization
+            quasiIdentifiers.forEach(qi => {
+              if (generalized[qi]) {
+                generalized[qi] = this.generalizeForKAnonymity(generalized[qi], qi);
+              }
+            });
+
+            return generalized;
+          });
+
+          anonymizedData.push(...generalizedRecords);
+          totalInformationLoss += records.length;
+        } else {
+          anonymizedData.push(...records);
+        }
+        groupsProcessed++;
+      }
+
+      // Calculate quality metrics
+      const kAnonymityLevel = Math.min(...Array.from(groups.values()).map(g => g.length));
+      const informationLoss = (totalInformationLoss / dataset.length) * 100;
+      const dataUtility = 100 - informationLoss;
+
+      logger.info('K-anonymity anonymization completed', 'anonymization-utils', {
+        originalRecords: dataset.length,
+        anonymizedRecords: anonymizedData.length,
+        kAnonymityLevel,
+        informationLoss,
+        dataUtility
+      });
+
+      return {
+        anonymizedData,
+        qualityMetrics: {
+          kAnonymityLevel,
+          informationLoss,
+          dataUtility
+        }
+      };
+    } catch (error) {
+      logger.error('Error in k-anonymity anonymization', 'anonymization-utils', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Apply differential privacy noise
+   */
+  applyDifferentialPrivacy(
+    value: number,
+    epsilon: number = 1.0,
+    sensitivity: number = 1.0
+  ): number {
+    try {
+      // Laplace mechanism for differential privacy
+      const scale = sensitivity / epsilon;
+      const noise = this.generateLaplaceNoise(scale);
+
+      return value + noise;
+    } catch (error) {
+      logger.error('Error applying differential privacy', 'anonymization-utils', { error });
+      return value;
+    }
+  }
+
+  /**
+   * Generate Laplace noise for differential privacy
+   */
+  private generateLaplaceNoise(scale: number): number {
+    // Box-Muller transform to generate Laplace noise
+    const u1 = Math.random();
+    const u2 = Math.random();
+
+    if (u1 <= 0.5) {
+      return scale * Math.log(2 * u1);
+    } else {
+      return -scale * Math.log(2 * (1 - u1));
+    }
+  }
+
+  /**
+   * Enhanced field detection and classification
+   */
+  classifyDataFields(data: any): {
+    identifiers: string[];
+    quasiIdentifiers: string[];
+    sensitiveAttributes: string[];
+    nonSensitive: string[];
+  } {
+    const classification = {
+      identifiers: [] as string[],
+      quasiIdentifiers: [] as string[],
+      sensitiveAttributes: [] as string[],
+      nonSensitive: [] as string[]
+    };
+
+    const identifierPatterns = [
+      /^id$/i, /^.*_id$/i, /^uuid$/i, /^email$/i, /^ssn$/i, /^passport$/i
+    ];
+
+    const quasiIdentifierPatterns = [
+      /age/i, /birth/i, /zip/i, /postal/i, /city/i, /gender/i, /occupation/i
+    ];
+
+    const sensitivePatterns = [
+      /medical/i, /health/i, /diagnosis/i, /treatment/i, /medication/i,
+      /income/i, /salary/i, /financial/i, /credit/i, /insurance/i
+    ];
+
+    Object.keys(data).forEach(field => {
+      if (identifierPatterns.some(pattern => pattern.test(field))) {
+        classification.identifiers.push(field);
+      } else if (quasiIdentifierPatterns.some(pattern => pattern.test(field))) {
+        classification.quasiIdentifiers.push(field);
+      } else if (sensitivePatterns.some(pattern => pattern.test(field))) {
+        classification.sensitiveAttributes.push(field);
+      } else {
+        classification.nonSensitive.push(field);
+      }
+    });
+
+    return classification;
+  }
+
+  /**
+   * Batch anonymization with progress tracking
+   */
+  async batchAnonymize(
+    records: any[],
+    options: AnonymizationOptions & { batchSize?: number } = {
+      ...ANONYMIZATION_CONFIG.defaultOptions,
+      batchSize: 100
+    },
+    progressCallback?: (progress: number, processed: number, total: number) => void
+  ): Promise<{
+    anonymizedRecords: any[];
+    processingStats: {
+      totalProcessed: number;
+      successCount: number;
+      errorCount: number;
+      processingTime: number;
+    };
+  }> {
+    const startTime = Date.now();
+    const batchSize = options.batchSize || 100;
+    const anonymizedRecords: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+
+        for (const record of batch) {
+          try {
+            // Determine record type and apply appropriate anonymization
+            const anonymized = await this.anonymizeRecord(record, options);
+            anonymizedRecords.push(anonymized);
+            successCount++;
+          } catch (error) {
+            logger.error('Error anonymizing record', 'anonymization-utils', { error, recordIndex: i });
+            errorCount++;
+          }
+        }
+
+        // Report progress
+        const processed = Math.min(i + batchSize, records.length);
+        const progress = (processed / records.length) * 100;
+
+        if (progressCallback) {
+          progressCallback(progress, processed, records.length);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+
+      logger.info('Batch anonymization completed', 'anonymization-utils', {
+        totalRecords: records.length,
+        successCount,
+        errorCount,
+        processingTime
+      });
+
+      return {
+        anonymizedRecords,
+        processingStats: {
+          totalProcessed: records.length,
+          successCount,
+          errorCount,
+          processingTime
+        }
+      };
+    } catch (error) {
+      logger.error('Error in batch anonymization', 'anonymization-utils', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Anonymize individual record based on type detection
+   */
+  private async anonymizeRecord(record: any, options: AnonymizationOptions): Promise<any> {
+    // Auto-detect record type
+    if (record.patient_id || record.medical_history) {
+      return this.anonymizePatient(record, options);
+    } else if (record.appointment_date || record.start_time) {
+      return this.anonymizeAppointment(record, options);
+    } else if (record.treatment_type || record.procedure) {
+      return this.anonymizeTreatment(record, options);
+    } else if (record.amount || record.invoice_number) {
+      return this.anonymizeInvoice(record, options);
+    } else if (record.consent_type || record.consent_status) {
+      return this.anonymizeConsent(record, options);
+    } else {
+      // Default to user anonymization
+      return this.anonymizeUser(record, options);
+    }
+  }
+
+  /**
+   * Generalize value for k-anonymity
+   */
+  private generalizeForKAnonymity(value: any, fieldType: string): string {
+    if (fieldType.includes('age')) {
+      const age = parseInt(value);
+      if (age < 25) return '18-24';
+      if (age < 35) return '25-34';
+      if (age < 45) return '35-44';
+      if (age < 55) return '45-54';
+      if (age < 65) return '55-64';
+      return '65+';
+    }
+
+    if (fieldType.includes('city')) {
+      return '[GENERALIZED_REGION]';
+    }
+
+    if (fieldType.includes('gender')) {
+      return value; // Keep as is for k-anonymity
+    }
+
+    return '[GENERALIZED]';
+  }
+
+  /**
+   * Get anonymization quality metrics
+   */
+  getQualityMetrics(): {
+    totalFields: number;
+    anonymizedFields: number;
+    anonymizationRate: number;
+    techniquesUsed: string[];
+    dataTypesProcessed: string[];
+  } {
+    return {
+      totalFields: this.qualityMetrics.totalFields,
+      anonymizedFields: this.qualityMetrics.anonymizedFields,
+      anonymizationRate: this.qualityMetrics.totalFields > 0
+        ? (this.qualityMetrics.anonymizedFields / this.qualityMetrics.totalFields) * 100
+        : 0,
+      techniquesUsed: Array.from(this.qualityMetrics.techniques),
+      dataTypesProcessed: Array.from(this.qualityMetrics.dataTypes)
+    };
+  }
+
+  /**
+   * Reset quality metrics
+   */
+  resetQualityMetrics(): void {
+    this.qualityMetrics = {
+      totalFields: 0,
+      anonymizedFields: 0,
+      techniques: new Set<string>(),
+      dataTypes: new Set<string>()
+    };
+  }
+
+  /**
+   * Clear anonymization cache
+   */
+  clearCache(): void {
+    this.anonymizationCache.clear();
   }
 }
 

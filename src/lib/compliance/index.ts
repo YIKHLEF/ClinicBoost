@@ -7,14 +7,27 @@
 export { gdprService, type ConsentData, type DataExportOptions, type DataSubjectRequestData } from './gdpr-service';
 export { auditService, type AuditEvent, type AuditSearchFilters, type AuditStatistics } from './audit-service';
 export { dataRetentionService, type RetentionPolicyData, type DataLifecycleReport } from './data-retention-service';
-export { 
-  consentService, 
-  type ConsentType, 
-  type ConsentStatus, 
-  type ConsentRequest, 
+export {
+  consentService,
+  type ConsentType,
+  type ConsentStatus,
+  type ConsentRequest,
   type ConsentPreferences,
-  type ConsentBannerConfig 
+  type ConsentBannerConfig
 } from './consent-service';
+export {
+  consentWorkflowService,
+  type ConsentWorkflow,
+  type WorkflowExecution,
+  type ConsentNotification
+} from './consent-workflow-service';
+export {
+  anonymizationEngine,
+  AnonymizationEngine,
+  type AnonymizationTechnique,
+  type AnonymizationLevel,
+  type AnonymizationOptions
+} from './anonymization-utils';
 
 /**
  * Main Compliance Service
