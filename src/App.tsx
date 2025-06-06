@@ -70,11 +70,18 @@ import { ariaManager } from './lib/accessibility/aria-attributes';
 import { keyboardNavigation } from './lib/accessibility/keyboard-navigation';
 import { focusManager } from './lib/accessibility/focus-management';
 import { colorContrastManager } from './lib/accessibility/color-contrast';
+import { advancedKeyboardNavigation } from './lib/accessibility/advanced-keyboard-navigation';
+import { screenReaderOptimization } from './lib/accessibility/screen-reader-optimization';
+import { enhancedHighContrast } from './lib/accessibility/enhanced-high-contrast';
+import { advancedFocusManagement } from './lib/accessibility/advanced-focus-management';
 
 // Initialize integration features
 import { calendarSync } from './lib/integrations/calendar-sync';
 import { ehrPMS } from './lib/integrations/ehr-pms';
 import { analyticsCore } from './lib/integrations/analytics-core';
+
+// Initialize performance monitoring
+import { advancedPerformanceMonitoring } from './lib/performance/advanced-monitoring';
 
 // Main app content with onboarding integration
 const AppContent: React.FC = () => {
