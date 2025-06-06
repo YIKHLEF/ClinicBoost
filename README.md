@@ -196,13 +196,36 @@ Add new translations in `src/i18n/locales/`
 - Update documentation as needed
 - Use conventional commits
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the `/docs` directory:
+
+### 🔌 API Documentation
+- [API Overview](./docs/api/README.md) - Complete API reference
+- [Authentication](./docs/api/authentication.md) - Auth and authorization guide
+- [Patient Management API](./docs/api/patients.md) - Patient CRUD operations
+- [Appointment Scheduling API](./docs/api/appointments.md) - Appointment management
+- [Error Handling](./docs/api/errors.md) - Error codes and troubleshooting
+
+### 👥 User Guide
+- [Getting Started](./docs/user-guide/getting-started.md) - Quick start guide
+- [Patient Management](./docs/user-guide/patient-management.md) - Complete patient management guide
+- [Multi-Clinic Support](./docs/MULTI_CLINIC_SUPPORT.md) - Multi-location management
+
+### 🛠️ Developer Documentation
+- [Architecture Overview](./docs/developer/architecture.md) - System design and patterns
+- [Development Setup](./docs/developer/setup.md) - Local development environment
+- [Component Library](./docs/developer/components.md) - UI component documentation
+- [Testing Guide](./TESTING_GUIDE.md) - Comprehensive testing documentation
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-- **Documentation**: [docs.clinicboost.com](https://docs.clinicboost.com)
+- **Documentation**: [Complete Documentation](./docs/README.md)
+- **API Reference**: [API Documentation](./docs/api/README.md)
 - **Issues**: [GitHub Issues](https://github.com/your-username/clinicboost/issues)
 - **Email**: support@clinicboost.com
 
