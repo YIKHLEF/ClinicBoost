@@ -7,7 +7,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import GlobalSearch from '../components/GlobalSearch';
 import { Breadcrumbs } from '../components/ui/Breadcrumbs';
 import { ClinicSwitcher } from '../components/clinic/ClinicSwitcher';
-import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone, Shield, Building2, Share2, WifiOff } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone, Shield, Building2, Share2, WifiOff, Activity } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useRBAC } from '../hooks/useRBAC';
 import { PermissionAction } from '../lib/user-management/user-service';
@@ -65,6 +65,7 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.accessibility'), path: '/accessibility', icon: Eye },
     { name: t('navigation.mobileTesting'), path: '/mobile-testing', icon: Smartphone },
     { name: t('navigation.integrations'), path: '/integrations', icon: Zap },
+    { name: t('navigation.performance'), path: '/performance', icon: Activity },
     { name: t('navigation.offlineSettings'), path: '/offline-settings', icon: WifiOff },
     { name: t('navigation.settings'), path: '/settings', icon: Settings },
   ];

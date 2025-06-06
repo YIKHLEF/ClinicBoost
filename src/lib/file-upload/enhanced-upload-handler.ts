@@ -170,7 +170,7 @@ export class EnhancedUploadHandler {
     }
 
     // Get upload status from server
-    const uploadStatus = await this.getUploadStatus(resumeToken);
+    const uploadStatus = await this.getResumeUploadStatus(resumeToken);
     
     // Update chunk statuses based on server response
     this.updateChunkStatuses(job, uploadStatus);
@@ -531,7 +531,7 @@ export class EnhancedUploadHandler {
     };
   }
 
-  private async getUploadStatus(resumeToken: string): Promise<any> {
+  private async getResumeUploadStatus(resumeToken: string): Promise<any> {
     // Implementation would get upload status from server
     return {};
   }

@@ -1226,11 +1226,13 @@
     "userManagement": "User Management",
     "accessibility": "Accessibility",
     "integrations": "Integrations",
+    "performance": "Performance",
     "testConnection": "Test Connection",
     "i18nTest": "Internationalization Test",
     "reportsTest": "Reports Test",
     "backupTest": "Backup Test",
-    "mobileTesting": "Mobile Testing"
+    "mobileTesting": "Mobile Testing",
+    "offlineSettings": "Offline Settings"
   },
   "breadcrumbs": {
     "home": "Home",

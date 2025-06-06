@@ -20,6 +20,7 @@ export default defineConfig(({ command, mode }) => {
         registerType: 'autoUpdate',
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/.*\.supabase\.co\/.*$/,
@@ -123,6 +124,7 @@ export default defineConfig(({ command, mode }) => {
       assetsDir: 'assets',
       sourcemap: !isProduction,
       minify: isProduction ? 'esbuild' : false,
+      chunkSizeWarningLimit: 1000, // Increase chunk size warning limit to 1MB
 
       // Chunk splitting for better caching
       rollupOptions: {
@@ -136,6 +138,17 @@ export default defineConfig(({ command, mode }) => {
             i18n: ['react-i18next', 'i18next'],
             charts: ['recharts'],
             utils: ['date-fns', 'clsx'],
+            performance: [
+              'src/lib/performance/advanced-monitoring.ts',
+              'src/lib/performance/real-time-alerts.ts',
+              'src/lib/performance/regression-detection.ts',
+              'src/lib/performance/mobile-cache-strategies.ts',
+              'src/lib/performance/performance-integration.ts'
+            ],
+            mobile: [
+              'src/lib/mobile/performance-optimizer.ts',
+              'src/lib/mobile/device-detection.ts'
+            ]
           },
         },
       },

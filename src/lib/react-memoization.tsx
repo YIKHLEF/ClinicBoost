@@ -277,7 +277,7 @@ export const withMemoization = <P extends object>(
 };
 
 // Context with memoization
-export const createMemoizedContext = <T>(defaultValue: T) => {
+export const createMemoizedContext = <T,>(defaultValue: T) => {
   const Context = React.createContext<T>(defaultValue);
 
   const Provider: React.FC<{ value: T; children: React.ReactNode }> = memo(

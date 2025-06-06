@@ -205,49 +205,6 @@ class TwilioService {
     return status;
   }
 
-export interface SMSMessage {
-  to: string;
-  body: string;
-  from?: string;
-  mediaUrl?: string[];
-}
-
-export interface WhatsAppMessage {
-  to: string;
-  body: string;
-  from?: string;
-  mediaUrl?: string[];
-}
-
-export interface CallOptions {
-  to: string;
-  url?: string;
-  record?: boolean;
-  timeout?: number;
-}
-
-// Format phone number to international format
-export const formatPhoneNumber = (phone: string): string => {
-  const cleaned = phone.replace(/\s/g, '');
-
-  // If already in international format
-  if (cleaned.startsWith('+212')) {
-    return cleaned;
-  }
-
-  // If starts with 0, replace with +212
-  if (cleaned.startsWith('0')) {
-    return `+212${cleaned.substring(1)}`;
-  }
-
-  // If just the number without country code
-  if (/^[5-7]\d{8}$/.test(cleaned)) {
-    return `+212${cleaned}`;
-  }
-
-  return cleaned;
-};
-
   async sendSMS(message: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       if (!this.initialized) {
@@ -412,6 +369,49 @@ export const formatPhoneNumber = (phone: string): string => {
     }
   }
 }
+
+export interface SMSMessage {
+  to: string;
+  body: string;
+  from?: string;
+  mediaUrl?: string[];
+}
+
+export interface WhatsAppMessage {
+  to: string;
+  body: string;
+  from?: string;
+  mediaUrl?: string[];
+}
+
+export interface CallOptions {
+  to: string;
+  url?: string;
+  record?: boolean;
+  timeout?: number;
+}
+
+// Format phone number to international format
+export const formatPhoneNumber = (phone: string): string => {
+  const cleaned = phone.replace(/\s/g, '');
+
+  // If already in international format
+  if (cleaned.startsWith('+212')) {
+    return cleaned;
+  }
+
+  // If starts with 0, replace with +212
+  if (cleaned.startsWith('0')) {
+    return `+212${cleaned.substring(1)}`;
+  }
+
+  // If just the number without country code
+  if (/^[5-7]\d{8}$/.test(cleaned)) {
+    return `+212${cleaned}`;
+  }
+
+  return cleaned;
+};
 
 // Create singleton instance
 const twilioService = new TwilioService();

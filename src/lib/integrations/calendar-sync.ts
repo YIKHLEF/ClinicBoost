@@ -1196,37 +1196,7 @@ END:VCALENDAR`;
     }
   }
 
-  /**
-   * Get provider by ID
-   */
-  getProvider(providerId: string): CalendarProvider | undefined {
-    return this.providers.get(providerId);
-  }
 
-  /**
-   * Enable/disable provider
-   */
-  async toggleProvider(providerId: string, enabled: boolean): Promise<void> {
-    const provider = this.providers.get(providerId);
-    if (!provider) {
-      throw new Error(`Provider ${providerId} not found`);
-    }
-
-    provider.enabled = enabled;
-    this.providers.set(providerId, provider);
-
-    if (enabled) {
-      this.scheduleSyncForProvider(providerId);
-    } else {
-      const interval = this.syncIntervals.get(providerId);
-      if (interval) {
-        clearInterval(interval);
-        this.syncIntervals.delete(providerId);
-      }
-    }
-
-    await this.saveProviderConfiguration(providerId, provider);
-  }
 
   /**
    * Manual sync trigger

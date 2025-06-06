@@ -146,30 +146,44 @@ class MobilePerformanceOptimizer {
    * Observe Core Web Vitals
    */
   private observeWebVitals(): void {
-    // Largest Contentful Paint (LCP)
-    new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      const lastEntry = entries[entries.length - 1];
-      this.metrics.loadTime = lastEntry.startTime;
-    }).observe({ entryTypes: ['largest-contentful-paint'] });
+    if (!('PerformanceObserver' in window)) return;
 
-    // First Input Delay (FID)
-    new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      entries.forEach((entry: any) => {
-        this.metrics.userExperience = Math.max(0, 100 - entry.processingStart - entry.startTime);
-      });
-    }).observe({ entryTypes: ['first-input'] });
+    try {
+      // Largest Contentful Paint (LCP)
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        const lastEntry = entries[entries.length - 1];
+        this.metrics.loadTime = lastEntry.startTime;
+      }).observe({ entryTypes: ['largest-contentful-paint'] });
+    } catch (error) {
+      console.warn('LCP observer not supported:', error);
+    }
 
-    // Cumulative Layout Shift (CLS)
-    new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      entries.forEach((entry: any) => {
-        if (!entry.hadRecentInput) {
-          this.metrics.renderTime += entry.value;
-        }
-      });
-    }).observe({ entryTypes: ['layout-shift'] });
+    try {
+      // First Input Delay (FID)
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        entries.forEach((entry: any) => {
+          this.metrics.userExperience = Math.max(0, 100 - entry.processingStart - entry.startTime);
+        });
+      }).observe({ entryTypes: ['first-input'] });
+    } catch (error) {
+      console.warn('FID observer not supported:', error);
+    }
+
+    try {
+      // Cumulative Layout Shift (CLS)
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        entries.forEach((entry: any) => {
+          if (!entry.hadRecentInput) {
+            this.metrics.renderTime += entry.value;
+          }
+        });
+      }).observe({ entryTypes: ['layout-shift'] });
+    } catch (error) {
+      console.warn('CLS observer not supported:', error);
+    }
   }
 
   /**
@@ -191,15 +205,226 @@ class MobilePerformanceOptimizer {
    * Monitor network usage
    */
   private monitorNetworkUsage(): void {
-    const observer = new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      entries.forEach((entry: any) => {
-        if (entry.transferSize) {
-          this.metrics.networkUsage += entry.transferSize;
-        }
+    if (!('PerformanceObserver' in window)) return;
+
+    try {
+      // Monitor resource loading
+      const observer = new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        entries.forEach((entry: any) => {
+          if (entry.transferSize) {
+            this.metrics.networkUsage += entry.transferSize;
+          }
+        });
       });
-    });
-    observer.observe({ entryTypes: ['resource'] });
+      observer.observe({ entryTypes: ['resource'] });
+    } catch (error) {
+      console.warn('Resource observer not supported:', error);
+    }
+
+    // Monitor network connection changes
+    this.monitorNetworkConnection();
+  }
+
+  /**
+   * Monitor network connection and adapt accordingly
+   */
+  private monitorNetworkConnection(): void {
+    const updateNetworkInfo = () => {
+      const connection = (navigator as any).connection;
+      if (connection) {
+        const networkInfo = {
+          downlink: connection.downlink || 0,
+          effectiveType: connection.effectiveType || 'unknown',
+          rtt: connection.rtt || 0,
+          saveData: connection.saveData || false,
+        };
+
+        // Update metrics
+        this.metrics.networkUsage = networkInfo;
+
+        // Adapt to network conditions
+        this.adaptToNetworkConditions(networkInfo);
+      }
+    };
+
+    updateNetworkInfo();
+
+    // Listen for network changes
+    if ('connection' in navigator) {
+      (navigator as any).connection.addEventListener('change', updateNetworkInfo);
+    }
+
+    // Periodic network quality assessment
+    setInterval(() => {
+      this.assessNetworkQuality();
+    }, 30000);
+  }
+
+  /**
+   * Adapt performance settings to network conditions
+   */
+  private adaptToNetworkConditions(networkInfo: any): void {
+    const { effectiveType, downlink, rtt, saveData } = networkInfo;
+
+    // Network-aware resource loading
+    this.adjustResourceLoading(effectiveType, downlink, rtt, saveData);
+
+    // Adaptive image quality
+    this.adjustImageQuality(effectiveType, saveData);
+
+    // Request prioritization
+    this.adjustRequestPrioritization(effectiveType, rtt);
+
+    // Prefetch strategy
+    this.adjustPrefetchStrategy(effectiveType, saveData);
+
+    // Compression settings
+    this.adjustCompressionSettings(effectiveType, saveData);
+  }
+
+  /**
+   * Adjust resource loading based on network
+   */
+  private adjustResourceLoading(effectiveType: string, downlink: number, rtt: number, saveData: boolean): void {
+    if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
+      // Minimal loading for poor connections
+      this.config.maxConcurrentRequests = 1;
+      this.config.enableOfflineMode = false;
+      this.disableNonEssentialResources();
+    } else if (effectiveType === '3g' || downlink < 1.5) {
+      // Conservative loading for moderate connections
+      this.config.maxConcurrentRequests = 2;
+      this.enableProgressiveLoading();
+    } else if (effectiveType === '4g' && downlink > 5) {
+      // Aggressive loading for good connections
+      this.config.maxConcurrentRequests = 6;
+      this.enableAdvancedFeatures();
+    }
+  }
+
+  /**
+   * Adjust image quality based on network
+   */
+  private adjustImageQuality(effectiveType: string, saveData: boolean): void {
+    if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
+      this.config.imageQuality = 'low';
+    } else if (effectiveType === '3g') {
+      this.config.imageQuality = 'medium';
+    } else {
+      this.config.imageQuality = 'auto';
+    }
+  }
+
+  /**
+   * Adjust request prioritization
+   */
+  private adjustRequestPrioritization(effectiveType: string, rtt: number): void {
+    if (rtt > 1000 || effectiveType === 'slow-2g' || effectiveType === '2g') {
+      // High latency - prioritize critical resources only
+      this.enableStrictPrioritization();
+    } else if (rtt > 500 || effectiveType === '3g') {
+      // Moderate latency - balanced prioritization
+      this.enableBalancedPrioritization();
+    } else {
+      // Low latency - normal prioritization
+      this.enableNormalPrioritization();
+    }
+  }
+
+  /**
+   * Adjust prefetch strategy
+   */
+  private adjustPrefetchStrategy(effectiveType: string, saveData: boolean): void {
+    if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
+      this.config.prefetchStrategy = 'none';
+    } else if (effectiveType === '3g') {
+      this.config.prefetchStrategy = 'viewport';
+    } else {
+      this.config.prefetchStrategy = 'aggressive';
+    }
+  }
+
+  /**
+   * Adjust compression settings
+   */
+  private adjustCompressionSettings(effectiveType: string, saveData: boolean): void {
+    if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
+      // Maximum compression for slow connections
+      this.enableMaxCompression();
+    } else if (effectiveType === '3g') {
+      // Balanced compression
+      this.enableBalancedCompression();
+    } else {
+      // Minimal compression for fast connections
+      this.enableMinimalCompression();
+    }
+  }
+
+  /**
+   * Assess network quality through performance tests
+   */
+  private async assessNetworkQuality(): Promise<void> {
+    try {
+      const startTime = performance.now();
+
+      // Test with a small image
+      const testUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      await fetch(testUrl);
+
+      const endTime = performance.now();
+      const latency = endTime - startTime;
+
+      // Update network quality assessment
+      this.updateNetworkQualityMetrics(latency);
+
+    } catch (error) {
+      console.warn('Network quality assessment failed:', error);
+    }
+  }
+
+  /**
+   * Update network quality metrics
+   */
+  private updateNetworkQualityMetrics(latency: number): void {
+    // Simple quality classification
+    let quality: 'poor' | 'fair' | 'good' | 'excellent';
+
+    if (latency > 2000) {
+      quality = 'poor';
+    } else if (latency > 1000) {
+      quality = 'fair';
+    } else if (latency > 500) {
+      quality = 'good';
+    } else {
+      quality = 'excellent';
+    }
+
+    // Store quality assessment
+    this.metrics.networkQuality = quality;
+
+    // Trigger adaptive optimizations
+    this.adaptToNetworkQuality(quality);
+  }
+
+  /**
+   * Adapt to assessed network quality
+   */
+  private adaptToNetworkQuality(quality: 'poor' | 'fair' | 'good' | 'excellent'): void {
+    switch (quality) {
+      case 'poor':
+        this.enableEmergencyMode();
+        break;
+      case 'fair':
+        this.enableConservativeMode();
+        break;
+      case 'good':
+        this.enableBalancedMode();
+        break;
+      case 'excellent':
+        this.enableOptimalMode();
+        break;
+    }
   }
 
   /**
@@ -329,8 +554,8 @@ class MobilePerformanceOptimizer {
     if (!componentName) return;
 
     try {
-      // Dynamic import based on component name
-      const module = await import(`../../components/${componentName}`);
+      // Dynamic import based on component name with proper extension
+      const module = await import(`../../components/${componentName}.tsx`);
       const Component = module.default || module[componentName];
       
       // Render component (this would be handled by React in practice)
@@ -604,6 +829,160 @@ class MobilePerformanceOptimizer {
     if (observer) {
       observer.observe(element);
     }
+  }
+
+  /**
+   * Disable non-essential resources for poor connections
+   */
+  private disableNonEssentialResources(): void {
+    // Disable animations
+    document.body.classList.add('reduce-motion');
+
+    // Disable auto-play videos
+    const videos = document.querySelectorAll('video[autoplay]');
+    videos.forEach(video => {
+      (video as HTMLVideoElement).autoplay = false;
+    });
+
+    // Disable background images
+    document.body.classList.add('disable-bg-images');
+  }
+
+  /**
+   * Enable progressive loading
+   */
+  private enableProgressiveLoading(): void {
+    // Enable skeleton screens
+    document.body.classList.add('enable-skeletons');
+
+    // Progressive image loading
+    this.config.enableLazyLoading = true;
+  }
+
+  /**
+   * Enable advanced features for good connections
+   */
+  private enableAdvancedFeatures(): void {
+    // Enable all animations
+    document.body.classList.remove('reduce-motion');
+
+    // Enable prefetching
+    this.config.prefetchStrategy = 'aggressive';
+
+    // Enable high-quality images
+    this.config.imageQuality = 'high';
+  }
+
+  /**
+   * Enable strict prioritization for high latency
+   */
+  private enableStrictPrioritization(): void {
+    // Only load critical resources
+    this.config.maxConcurrentRequests = 1;
+    this.config.prefetchStrategy = 'none';
+  }
+
+  /**
+   * Enable balanced prioritization
+   */
+  private enableBalancedPrioritization(): void {
+    this.config.maxConcurrentRequests = 3;
+    this.config.prefetchStrategy = 'viewport';
+  }
+
+  /**
+   * Enable normal prioritization
+   */
+  private enableNormalPrioritization(): void {
+    this.config.maxConcurrentRequests = 6;
+    this.config.prefetchStrategy = 'aggressive';
+  }
+
+  /**
+   * Enable maximum compression
+   */
+  private enableMaxCompression(): void {
+    // Set compression headers for requests
+    this.setCompressionLevel('high');
+  }
+
+  /**
+   * Enable balanced compression
+   */
+  private enableBalancedCompression(): void {
+    this.setCompressionLevel('medium');
+  }
+
+  /**
+   * Enable minimal compression
+   */
+  private enableMinimalCompression(): void {
+    this.setCompressionLevel('low');
+  }
+
+  /**
+   * Set compression level
+   */
+  private setCompressionLevel(level: 'low' | 'medium' | 'high'): void {
+    const compressionHeaders = {
+      low: 'gzip',
+      medium: 'gzip, deflate',
+      high: 'gzip, deflate, br'
+    };
+
+    // Intercept fetch to add compression headers
+    const originalFetch = window.fetch;
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      headers.set('Accept-Encoding', compressionHeaders[level]);
+
+      return originalFetch(input, { ...init, headers });
+    };
+  }
+
+  /**
+   * Enable emergency mode for very poor connections
+   */
+  private enableEmergencyMode(): void {
+    this.config.maxConcurrentRequests = 1;
+    this.config.imageQuality = 'low';
+    this.config.animationLevel = 'none';
+    this.config.prefetchStrategy = 'none';
+    this.config.enableOfflineMode = true;
+
+    document.body.classList.add('emergency-mode');
+  }
+
+  /**
+   * Enable conservative mode
+   */
+  private enableConservativeMode(): void {
+    this.config.maxConcurrentRequests = 2;
+    this.config.imageQuality = 'medium';
+    this.config.animationLevel = 'reduced';
+    this.config.prefetchStrategy = 'viewport';
+  }
+
+  /**
+   * Enable balanced mode
+   */
+  private enableBalancedMode(): void {
+    this.config.maxConcurrentRequests = 4;
+    this.config.imageQuality = 'auto';
+    this.config.animationLevel = 'reduced';
+    this.config.prefetchStrategy = 'viewport';
+  }
+
+  /**
+   * Enable optimal mode
+   */
+  private enableOptimalMode(): void {
+    this.config.maxConcurrentRequests = 6;
+    this.config.imageQuality = 'high';
+    this.config.animationLevel = 'full';
+    this.config.prefetchStrategy = 'aggressive';
+
+    document.body.classList.remove('emergency-mode', 'reduce-motion');
   }
 
   /**

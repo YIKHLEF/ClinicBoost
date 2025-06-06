@@ -53,6 +53,9 @@ import { UserManagement } from './components/users/UserManagement';
 import { MobileTestingDashboard } from './components/mobile/MobileTestingDashboard';
 import { ResponsiveProvider } from './hooks/useResponsive';
 
+// Performance components
+import { AdvancedPerformanceDashboard } from './components/performance/AdvancedPerformanceDashboard';
+
 // Test components
 import { ConfigTest } from './components/test/ConfigTest';
 import { AuthTest } from './components/test/AuthTest';
@@ -82,6 +85,7 @@ import { analyticsCore } from './lib/integrations/analytics-core';
 
 // Initialize performance monitoring
 import { advancedPerformanceMonitoring } from './lib/performance/advanced-monitoring';
+import { performanceIntegration } from './lib/performance/performance-integration';
 
 // Main app content with onboarding integration
 const AppContent: React.FC = () => {
@@ -99,6 +103,9 @@ const AppContent: React.FC = () => {
 
         // Initialize analytics
         await analyticsCore.initialize();
+
+        // Initialize performance monitoring
+        await performanceIntegration.initialize();
 
         console.log('Integration systems initialized successfully');
       } catch (error) {
@@ -162,6 +169,7 @@ const AppContent: React.FC = () => {
           <Route path="integrations" element={<IntegrationDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="mobile-testing" element={<MobileTestingDashboard />} />
+          <Route path="performance" element={<AdvancedPerformanceDashboard />} />
           <Route path="config-test" element={<ConfigTest />} />
           <Route path="auth-test" element={<AuthTest />} />
           <Route path="env-test" element={<EnvTest />} />

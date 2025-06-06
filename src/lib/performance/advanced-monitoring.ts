@@ -1,6 +1,6 @@
 /**
  * Advanced Performance Monitoring & Optimization
- * 
+ *
  * This module provides comprehensive performance monitoring including:
  * - Real User Monitoring (RUM) implementation
  * - Custom business metrics tracking
@@ -8,9 +8,12 @@
  * - Real-time performance alerts
  * - Automated performance regression detection
  * - Performance dashboard with actionable insights
+ * - Mobile network performance optimization
+ * - Advanced caching strategies
  */
 
 import { errorReporting } from '../monitoring/error-reporting';
+import { logger } from '../logging-monitoring';
 
 export interface PerformanceMetric {
   name: string;
@@ -27,6 +30,32 @@ export interface PerformanceBudget {
   unit: string;
   severity: 'warning' | 'error';
   enabled: boolean;
+}
+
+export interface PerformanceBaseline {
+  metric: string;
+  value: number;
+  timestamp: number;
+  environment: string;
+  version: string;
+  sampleSize: number;
+}
+
+export interface RegressionDetectionConfig {
+  enabled: boolean;
+  thresholdPercentage: number; // % increase to trigger regression alert
+  minimumSamples: number;
+  lookbackPeriod: number; // days
+  environments: string[];
+}
+
+export interface MobileNetworkOptimization {
+  enabled: boolean;
+  adaptiveLoading: boolean;
+  compressionLevel: 'low' | 'medium' | 'high';
+  prefetchStrategy: 'none' | 'critical' | 'aggressive';
+  imageOptimization: boolean;
+  resourcePrioritization: boolean;
 }
 
 export interface PerformanceAlert {
@@ -986,9 +1015,23 @@ class AdvancedPerformanceMonitoring {
 // Export singleton instance
 export const advancedPerformanceMonitoring = new AdvancedPerformanceMonitoring();
 
+// Initialize integrated performance monitoring
+advancedPerformanceMonitoring.initialize();
+
 // Export utility functions
-export const trackCustomMetric = (name: string, value: number, unit: string, tags?: Record<string, string>) =>
+export const trackCustomMetric = (name: string, value: number, unit: string, tags?: Record<string, string>) => {
   advancedPerformanceMonitoring.trackCustomMetric(name, value, unit, tags);
+
+  // Also send to regression detection
+  import('./regression-detection').then(({ recordMetric }) => {
+    recordMetric(name, value, tags?.environment, tags);
+  });
+
+  // Send to real-time alerts
+  import('./real-time-alerts').then(({ checkMetric }) => {
+    checkMetric(name, value, tags);
+  });
+};
 
 export const trackBusinessEvent = (name: string, category: BusinessMetric['category'], value?: number, unit?: string) =>
   advancedPerformanceMonitoring.trackBusinessEvent(name, category, value, unit);
