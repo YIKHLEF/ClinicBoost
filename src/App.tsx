@@ -26,11 +26,13 @@ const TestConnection = lazy(() => import('./pages/TestConnection'));
 const ClinicManagement = lazy(() => import('./pages/ClinicManagement'));
 const ResourceSharing = lazy(() => import('./pages/ResourceSharing'));
 const Search = lazy(() => import('./pages/Search'));
+const OfflineSettings = lazy(() => import('./pages/OfflineSettings'));
 
 // Context providers
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ClinicProvider } from './contexts/ClinicContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 import { ToastProvider } from './components/ui/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -148,6 +150,7 @@ const AppContent: React.FC = () => {
           <Route path="backup-recovery" element={<BackupRecovery />} />
           <Route path="compliance" element={<Compliance />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="offline-settings" element={<OfflineSettings />} />
           <Route path="accessibility" element={<AccessibilityDashboard />} />
           <Route path="integrations" element={<IntegrationDashboard />} />
           <Route path="users" element={<UserManagement />} />
@@ -201,8 +204,9 @@ function App() {
           <ToastProvider>
             <ResponsiveProvider>
               <AuthProvider>
-                <ClinicProvider>
-                  <OnboardingProvider>
+                <OfflineProvider>
+                  <ClinicProvider>
+                    <OnboardingProvider>
                 <Suspense fallback={
                   <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
                     <div className="text-center">
@@ -211,10 +215,11 @@ function App() {
                     </div>
                   </div>
                 }>
-                  <AppContent />
-                </Suspense>
-                  </OnboardingProvider>
-                </ClinicProvider>
+                    <AppContent />
+                  </Suspense>
+                    </OnboardingProvider>
+                  </ClinicProvider>
+                </OfflineProvider>
               </AuthProvider>
             </ResponsiveProvider>
           </ToastProvider>
