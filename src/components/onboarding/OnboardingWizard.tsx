@@ -21,7 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase, isDemoMode } from '../../lib/supabase';
 
 // Onboarding steps configuration
 const ONBOARDING_STEPS = [
@@ -225,6 +225,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       if (!user) return;
 
       try {
+        if (isDemoMode) {
+          // In demo mode, user has completed onboarding
+          onComplete();
+          return;
+        }
+
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('onboarding_completed, onboarding_step')
@@ -261,18 +267,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const handleStepSubmit = async (stepData: any) => {
     setOnboardingData(prev => ({ ...prev, [ONBOARDING_STEPS[currentStep].id]: stepData }));
-    
-    // Save progress to database
-    try {
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user?.id,
-          onboarding_step: currentStep + 1,
-          onboarding_data: { ...onboardingData, [ONBOARDING_STEPS[currentStep].id]: stepData },
-        });
-    } catch (error) {
-      console.error('Error saving onboarding progress:', error);
+
+    // Save progress to database (skip in demo mode)
+    if (!isDemoMode) {
+      try {
+        await supabase
+          .from('user_profiles')
+          .upsert({
+            user_id: user?.id,
+            onboarding_step: currentStep + 1,
+            onboarding_data: { ...onboardingData, [ONBOARDING_STEPS[currentStep].id]: stepData },
+          });
+      } catch (error) {
+        console.error('Error saving onboarding progress:', error);
+      }
     }
 
     if (currentStep === ONBOARDING_STEPS.length - 2) {
@@ -285,38 +293,40 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const completeOnboarding = async () => {
     setIsSubmitting(true);
-    
+
     try {
-      // Save all onboarding data
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user?.id,
-          onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString(),
-          onboarding_data: onboardingData,
-        });
-
-      // Create clinic record
-      if (onboardingData['clinic-info']) {
+      if (!isDemoMode) {
+        // Save all onboarding data
         await supabase
-          .from('clinics')
-          .insert({
-            ...onboardingData['clinic-info'],
-            owner_id: user?.id,
+          .from('user_profiles')
+          .upsert({
+            user_id: user?.id,
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString(),
+            onboarding_data: onboardingData,
           });
-      }
 
-      // Create services
-      if (onboardingData.services?.services) {
-        await supabase
-          .from('services')
-          .insert(
-            onboardingData.services.services.map((service: any) => ({
-              ...service,
-              clinic_id: user?.id, // This would be the actual clinic ID
-            }))
-          );
+        // Create clinic record
+        if (onboardingData['clinic-info']) {
+          await supabase
+            .from('clinics')
+            .insert({
+              ...onboardingData['clinic-info'],
+              owner_id: user?.id,
+            });
+        }
+
+        // Create services
+        if (onboardingData.services?.services) {
+          await supabase
+            .from('services')
+            .insert(
+              onboardingData.services.services.map((service: any) => ({
+                ...service,
+                clinic_id: user?.id, // This would be the actual clinic ID
+              }))
+            );
+        }
       }
 
       addToast({
@@ -343,15 +353,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const skipOnboarding = async () => {
     if (onSkip) {
       try {
-        await supabase
-          .from('user_profiles')
-          .upsert({
-            user_id: user?.id,
-            onboarding_completed: true,
-            onboarding_skipped: true,
-            onboarding_completed_at: new Date().toISOString(),
-          });
-        
+        if (!isDemoMode) {
+          await supabase
+            .from('user_profiles')
+            .upsert({
+              user_id: user?.id,
+              onboarding_completed: true,
+              onboarding_skipped: true,
+              onboarding_completed_at: new Date().toISOString(),
+            });
+        }
+
         onSkip();
       } catch (error) {
         console.error('Error skipping onboarding:', error);

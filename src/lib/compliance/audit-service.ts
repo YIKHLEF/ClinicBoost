@@ -8,7 +8,7 @@
  * - Audit log search and reporting
  */
 
-import { supabase } from '../supabase';
+import { supabase, isDemoMode } from '../supabase';
 import { logger } from '../logging-monitoring';
 import type { Database } from '../database.types';
 
@@ -89,9 +89,20 @@ export class AuditService {
    */
   async logEvent(event: AuditEvent): Promise<string> {
     try {
+      if (isDemoMode) {
+        // In demo mode, just log to console and return a mock ID
+        logger.info('Demo mode: Audit event logged', 'audit-service', {
+          action: event.action,
+          resourceType: event.resourceType,
+          resourceId: event.resourceId,
+          userId: event.userId
+        });
+        return 'demo-audit-id';
+      }
+
       // Determine risk level if not provided
       const riskLevel = event.riskLevel || this.assessRiskLevel(event);
-      
+
       // Add automatic compliance flags
       const complianceFlags = [
         ...(event.complianceFlags || []),

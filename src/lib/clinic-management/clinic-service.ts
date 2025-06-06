@@ -9,7 +9,7 @@
  * - Cross-clinic resource sharing
  */
 
-import { supabase } from '../supabase';
+import { supabase, isDemoMode } from '../supabase';
 import { logger } from '../logging-monitoring';
 import type { Database } from '../database.types';
 
@@ -75,6 +75,51 @@ class ClinicManagementService {
    */
   async getUserClinics(userId: string): Promise<ClinicWithMembership[]> {
     try {
+      if (isDemoMode) {
+        // Return demo clinic data
+        const demoClinic: ClinicWithMembership = {
+          id: 'demo-clinic-1',
+          name: 'Demo Medical Center',
+          type: 'general',
+          address: '123 Demo Street',
+          city: 'Demo City',
+          postal_code: '12345',
+          phone: '+1-555-0123',
+          email: 'contact@demo-clinic.com',
+          website: 'https://demo-clinic.com',
+          description: 'A demo clinic for testing purposes',
+          is_active: true,
+          owner_id: userId,
+          created_by: userId,
+          updated_by: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          membership: {
+            id: 'demo-membership-1',
+            clinic_id: 'demo-clinic-1',
+            user_id: userId,
+            role: 'admin',
+            permissions: {},
+            is_active: true,
+            joined_at: new Date().toISOString(),
+            created_by: userId,
+            updated_by: userId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            left_at: null
+          },
+          memberCount: 5,
+          resourceCount: 10
+        };
+
+        logger.info('Retrieved demo user clinics', 'clinic-management', {
+          userId,
+          clinicCount: 1
+        });
+
+        return [demoClinic];
+      }
+
       const { data, error } = await supabase
         .from('clinics')
         .select(`

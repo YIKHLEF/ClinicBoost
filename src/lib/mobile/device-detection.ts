@@ -68,9 +68,12 @@ class DeviceDetectionService {
   private listeners: Set<(info: DeviceInfo) => void> = new Set();
   private resizeObserver: ResizeObserver | null = null;
   private orientationChangeHandler: (() => void) | null = null;
+  private detectDeviceThrottled: (() => void) | null = null;
 
   constructor() {
     this.initialize();
+    // Throttle device detection to prevent excessive re-renders
+    this.detectDeviceThrottled = this.throttle(() => this.detectDevice(), 100);
   }
 
   /**
@@ -311,26 +314,44 @@ class DeviceDetectionService {
    * Setup event listeners
    */
   private setupEventListeners(): void {
-    // Viewport changes
+    // Viewport changes (throttled)
     this.resizeObserver = new ResizeObserver(() => {
-      this.detectDevice();
+      if (this.detectDeviceThrottled) {
+        this.detectDeviceThrottled();
+      }
     });
     this.resizeObserver.observe(document.documentElement);
 
     // Orientation changes
     this.orientationChangeHandler = () => {
-      setTimeout(() => this.detectDevice(), 100);
+      setTimeout(() => {
+        if (this.detectDeviceThrottled) {
+          this.detectDeviceThrottled();
+        }
+      }, 100);
     };
     window.addEventListener('orientationchange', this.orientationChangeHandler);
 
-    // Network changes
-    window.addEventListener('online', () => this.detectDevice());
-    window.addEventListener('offline', () => this.detectDevice());
+    // Network changes (throttled)
+    window.addEventListener('online', () => {
+      if (this.detectDeviceThrottled) {
+        this.detectDeviceThrottled();
+      }
+    });
+    window.addEventListener('offline', () => {
+      if (this.detectDeviceThrottled) {
+        this.detectDeviceThrottled();
+      }
+    });
 
-    // Connection changes
+    // Connection changes (throttled)
     const connection = (navigator as any).connection;
     if (connection) {
-      connection.addEventListener('change', () => this.detectDevice());
+      connection.addEventListener('change', () => {
+        if (this.detectDeviceThrottled) {
+          this.detectDeviceThrottled();
+        }
+      });
     }
   }
 
@@ -354,6 +375,31 @@ class DeviceDetectionService {
     if (this.deviceInfo) {
       this.listeners.forEach(callback => callback(this.deviceInfo!));
     }
+  }
+
+  /**
+   * Throttle function to prevent excessive calls
+   */
+  private throttle(func: () => void, delay: number): () => void {
+    let timeoutId: NodeJS.Timeout | null = null;
+    let lastExecTime = 0;
+
+    return () => {
+      const currentTime = Date.now();
+
+      if (currentTime - lastExecTime > delay) {
+        func();
+        lastExecTime = currentTime;
+      } else {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+          func();
+          lastExecTime = Date.now();
+        }, delay - (currentTime - lastExecTime));
+      }
+    };
   }
 
   /**

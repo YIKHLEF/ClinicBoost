@@ -112,61 +112,59 @@ export const ResponsiveProvider: React.FC<{
   // Memoize the final config to prevent infinite re-renders
   const finalConfig = useMemo(() => ({ ...defaultConfig, ...config }), [config]);
 
-  // Memoize the update function to prevent unnecessary re-renders
-  const updateResponsiveState = useMemo(() => {
-    return (deviceInfo: DeviceInfo) => {
-      const state: ResponsiveState = {
-        deviceInfo,
-        isMobile: deviceInfo.type === 'mobile',
-        isTablet: deviceInfo.type === 'tablet',
-        isDesktop: deviceInfo.type === 'desktop',
-        isTouchDevice: deviceInfo.viewport.isTouch,
+  // Use useCallback to prevent infinite re-renders
+  const updateResponsiveState = useCallback((deviceInfo: DeviceInfo) => {
+    const state: ResponsiveState = {
+      deviceInfo,
+      isMobile: deviceInfo.type === 'mobile',
+      isTablet: deviceInfo.type === 'tablet',
+      isDesktop: deviceInfo.type === 'desktop',
+      isTouchDevice: deviceInfo.viewport.isTouch,
 
-        viewport: {
-          width: deviceInfo.viewport.width,
-          height: deviceInfo.viewport.height,
-          orientation: deviceInfo.viewport.orientation,
-          breakpoint: deviceInfo.viewport.breakpoint,
-          safeArea: deviceInfo.viewport.safeArea,
-        },
+      viewport: {
+        width: deviceInfo.viewport.width,
+        height: deviceInfo.viewport.height,
+        orientation: deviceInfo.viewport.orientation,
+        breakpoint: deviceInfo.viewport.breakpoint,
+        safeArea: deviceInfo.viewport.safeArea,
+      },
 
-        network: {
-          isOnline: deviceInfo.network.isOnline,
-          isSlowNetwork: ['slow-2g', '2g'].includes(deviceInfo.network.effectiveType),
-          effectiveType: deviceInfo.network.effectiveType,
-          saveData: deviceInfo.network.saveData,
-        },
+      network: {
+        isOnline: deviceInfo.network.isOnline,
+        isSlowNetwork: ['slow-2g', '2g'].includes(deviceInfo.network.effectiveType),
+        effectiveType: deviceInfo.network.effectiveType,
+        saveData: deviceInfo.network.saveData,
+      },
 
-        performance: {
-          isLowEndDevice: deviceInfo.capabilities.deviceMemory <= 2 || deviceInfo.capabilities.hardwareConcurrency <= 2,
-          memoryUsage: deviceInfo.performance.memoryUsage,
-          batteryLevel: deviceInfo.performance.batteryLevel,
-          isCharging: deviceInfo.performance.isCharging,
-        },
+      performance: {
+        isLowEndDevice: deviceInfo.capabilities.deviceMemory <= 2 || deviceInfo.capabilities.hardwareConcurrency <= 2,
+        memoryUsage: deviceInfo.performance.memoryUsage,
+        batteryLevel: deviceInfo.performance.batteryLevel,
+        isCharging: deviceInfo.performance.isCharging,
+      },
 
-        breakpoints: {
-          xs: deviceInfo.viewport.width >= finalConfig.breakpoints.xs,
-          sm: deviceInfo.viewport.width >= finalConfig.breakpoints.sm,
-          md: deviceInfo.viewport.width >= finalConfig.breakpoints.md,
-          lg: deviceInfo.viewport.width >= finalConfig.breakpoints.lg,
-          xl: deviceInfo.viewport.width >= finalConfig.breakpoints.xl,
-          '2xl': deviceInfo.viewport.width >= finalConfig.breakpoints['2xl'],
-        },
+      breakpoints: {
+        xs: deviceInfo.viewport.width >= finalConfig.breakpoints.xs,
+        sm: deviceInfo.viewport.width >= finalConfig.breakpoints.sm,
+        md: deviceInfo.viewport.width >= finalConfig.breakpoints.md,
+        lg: deviceInfo.viewport.width >= finalConfig.breakpoints.lg,
+        xl: deviceInfo.viewport.width >= finalConfig.breakpoints.xl,
+        '2xl': deviceInfo.viewport.width >= finalConfig.breakpoints['2xl'],
+      },
 
-        mediaQueries: {
-          mobile: deviceInfo.type === 'mobile',
-          tablet: deviceInfo.type === 'tablet',
-          desktop: deviceInfo.type === 'desktop',
-          touch: deviceInfo.viewport.isTouch,
-          hover: deviceInfo.capabilities.hasHover,
-          reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-          darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
-          highContrast: window.matchMedia('(prefers-contrast: high)').matches,
-        },
-      };
-
-      setResponsiveState(state);
+      mediaQueries: {
+        mobile: deviceInfo.type === 'mobile',
+        tablet: deviceInfo.type === 'tablet',
+        desktop: deviceInfo.type === 'desktop',
+        touch: deviceInfo.viewport.isTouch,
+        hover: deviceInfo.capabilities.hasHover,
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
+        highContrast: window.matchMedia('(prefers-contrast: high)').matches,
+      },
     };
+
+    setResponsiveState(state);
   }, [finalConfig]);
 
   // Memoize the media query change handler
@@ -198,7 +196,7 @@ export const ResponsiveProvider: React.FC<{
         mql.removeEventListener('change', handleMediaQueryChange);
       });
     };
-  }, [updateResponsiveState, handleMediaQueryChange]);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   if (!responsiveState) {
     return null; // or loading component

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, isDemoMode } from '../lib/supabase';
 
 export interface OnboardingStatus {
   isCompleted: boolean;
@@ -30,7 +30,20 @@ export const useOnboarding = () => {
 
       try {
         setIsLoading(true);
-        
+
+        if (isDemoMode) {
+          // In demo mode, mark onboarding as completed
+          setStatus({
+            isCompleted: true,
+            isSkipped: false,
+            currentStep: 7,
+            completedAt: new Date().toISOString(),
+            data: { demo: true },
+          });
+          setIsLoading(false);
+          return;
+        }
+
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
           .select('onboarding_completed, onboarding_skipped, onboarding_step, onboarding_completed_at, onboarding_data')
@@ -76,6 +89,17 @@ export const useOnboarding = () => {
     if (!user) return;
 
     try {
+      if (isDemoMode) {
+        // In demo mode, just update local state
+        setStatus(prev => ({
+          ...prev,
+          isCompleted: true,
+          completedAt: new Date().toISOString(),
+          data,
+        }));
+        return;
+      }
+
       const { error } = await supabase
         .from('user_profiles')
         .upsert({
@@ -264,6 +288,13 @@ export const useOnboardingCheck = () => {
       }
 
       try {
+        if (isDemoMode) {
+          // In demo mode, user doesn't need onboarding
+          setNeedsOnboarding(false);
+          setIsChecking(false);
+          return;
+        }
+
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('onboarding_completed')

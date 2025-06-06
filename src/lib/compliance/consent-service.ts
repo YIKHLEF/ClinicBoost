@@ -9,7 +9,7 @@
  * - Third-party sharing consent
  */
 
-import { supabase } from '../supabase';
+import { supabase, isDemoMode } from '../supabase';
 import { logger } from '../logging-monitoring';
 import { auditService } from './audit-service';
 import type { Database } from '../database.types';
@@ -77,6 +77,17 @@ export class ConsentService {
    */
   async recordConsent(consentRequest: ConsentRequest): Promise<string> {
     try {
+      if (isDemoMode) {
+        // In demo mode, just return a mock ID and log the action
+        logger.info('Demo mode: Consent recorded', 'consent-service', {
+          consentType: consentRequest.consentType,
+          status: consentRequest.status,
+          userId: consentRequest.userId,
+          patientId: consentRequest.patientId
+        });
+        return 'demo-consent-id';
+      }
+
       const { data, error } = await supabase.rpc('record_consent', {
         p_user_id: consentRequest.userId || null,
         p_patient_id: consentRequest.patientId || null,
@@ -135,6 +146,11 @@ export class ConsentService {
     consentType?: ConsentType
   ): Promise<boolean> {
     try {
+      if (isDemoMode) {
+        // In demo mode, return true for all consent checks
+        return true;
+      }
+
       const { data, error } = await supabase.rpc('has_consent', {
         p_user_id: userId || null,
         p_patient_id: patientId || null,
@@ -358,6 +374,11 @@ export class ConsentService {
    */
   async shouldShowConsentBanner(userId?: string, patientId?: string): Promise<boolean> {
     try {
+      if (isDemoMode) {
+        // In demo mode, don't show consent banner
+        return false;
+      }
+
       // Check if user has any consent records
       let query = supabase
         .from('consent_records')
