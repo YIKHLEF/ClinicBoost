@@ -4,6 +4,9 @@
 import { secureConfig } from '../lib/config/secure-config';
 import { logger } from '../lib/logging-monitoring';
 import { handleError } from '../lib/error-handling';
+import { handleIntegrationError } from '../lib/error-handling/integration-errors';
+import { checkRateLimit, getRateLimitStatus } from '../lib/rate-limiting/advanced-rate-limiter';
+import { backendAPI } from '../lib/api/backend-endpoints';
 
 interface TwilioConfig {
   accountSid: string;
@@ -255,9 +258,16 @@ export const formatPhoneNumber = (phone: string): string => {
         throw new Error('Invalid phone number format');
       }
 
-      // Check rate limits
-      if (!this.checkRateLimit('sms', 'minute') || !this.checkRateLimit('sms', 'hour')) {
-        throw new Error('SMS rate limit exceeded');
+      // Check rate limits using advanced rate limiter
+      const rateLimitStatus = checkRateLimit('twilio-sms', message.to);
+      if (!rateLimitStatus.allowed) {
+        const error = new Error('SMS rate limit exceeded');
+        await handleIntegrationError(error, 'twilio-sms', {
+          phoneNumber: message.to,
+          retryAfter: rateLimitStatus.retryAfter,
+          remaining: rateLimitStatus.remaining
+        });
+        throw error;
       }
 
       const formattedTo = formatPhoneNumber(message.to);
@@ -290,35 +300,30 @@ export const formatPhoneNumber = (phone: string): string => {
           throw new Error('SMS delivery failed (simulated)');
         }
       } else {
-        // Production: Call backend API
-        const response = await fetch('/api/twilio/sms', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: formattedTo,
-            body: message.body,
-            from: message.from || this.config.phoneNumber,
-            mediaUrl: message.mediaUrl,
-          }),
+        // Production: Use backend API
+        const response = await backendAPI.sendSMS({
+          to: formattedTo,
+          message: message.body,
         });
 
-        if (!response.ok) {
-          throw new Error(`SMS API error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        logger.info('SMS sent successfully', 'twilio', { messageId: result.messageId, to: formattedTo });
+        logger.info('SMS sent successfully', 'twilio', {
+          messageId: response.messageId,
+          to: formattedTo
+        });
 
         return {
           success: true,
-          messageId: result.messageId,
+          messageId: response.messageId,
         };
       }
     } catch (error: any) {
       logger.error('SMS sending failed', 'twilio', { error: error.message, to: message.to });
-      handleError(error, 'twilio-sms');
+
+      await handleIntegrationError(error, 'twilio-sms', {
+        phoneNumber: message.to,
+        messageLength: message.body.length,
+      });
+
       return {
         success: false,
         error: error.message,

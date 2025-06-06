@@ -19,6 +19,9 @@ import {
 import { azureAIService } from '../../lib/integrations/azure-ai';
 import { getTwilioStatus, getTwilioRateLimitStatus } from '../../utils/twilio';
 import { mockHealthCheck } from '../../lib/api/mock-endpoints';
+import { getRateLimitStats, getRateLimitStatus } from '../../lib/rate-limiting/advanced-rate-limiter';
+import { getErrorStats } from '../../lib/error-handling/integration-errors';
+import { backendAPI } from '../../lib/api/backend-endpoints';
 
 interface ServiceStatus {
   name: string;

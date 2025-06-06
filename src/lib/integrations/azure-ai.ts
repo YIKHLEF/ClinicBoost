@@ -50,20 +50,78 @@ class AzureAIService {
 
   private async initialize(): Promise<void> {
     try {
-      const config = secureConfig.getAppConfig();
-      const { endpoint, apiKey } = config.integrations.azure;
+      const config = secureConfig.getIntegrationsConfig();
+      const azureConfig = config.azure;
 
-      if (!endpoint || !apiKey) {
-        logger.warn('Azure AI credentials not configured', 'azure-ai');
+      if (!azureConfig?.endpoint || !azureConfig?.apiKey) {
+        logger.warn('Azure AI credentials not configured, using mock responses', 'azure-ai');
+        this.initialized = false;
         return;
       }
 
-      this.client = new TextAnalyticsClient(endpoint, new AzureKeyCredential(apiKey));
+      // Validate configuration format
+      if (!this.validateConfiguration(azureConfig.endpoint, azureConfig.apiKey)) {
+        logger.error('Invalid Azure AI configuration format', 'azure-ai');
+        this.initialized = false;
+        return;
+      }
+
+      this.client = new TextAnalyticsClient(
+        azureConfig.endpoint,
+        new AzureKeyCredential(azureConfig.apiKey)
+      );
+
+      // Test the connection
+      await this.testConnection();
+
       this.initialized = true;
-      logger.info('Azure AI Text Analytics initialized successfully', 'azure-ai');
+      logger.info('Azure AI Text Analytics initialized successfully', 'azure-ai', {
+        endpoint: this.maskEndpoint(azureConfig.endpoint)
+      });
     } catch (error) {
       logger.error('Failed to initialize Azure AI Text Analytics', 'azure-ai', { error });
       handleError(error as Error, 'azure-ai-init');
+      this.initialized = false;
+    }
+  }
+
+  private validateConfiguration(endpoint: string, apiKey: string): boolean {
+    // Validate endpoint format
+    if (!endpoint || !endpoint.startsWith('https://')) {
+      logger.error('Azure AI endpoint must be a valid HTTPS URL', 'azure-ai');
+      return false;
+    }
+
+    // Validate API key format
+    if (!apiKey || apiKey.length < 32) {
+      logger.error('Azure AI API key appears to be invalid', 'azure-ai');
+      return false;
+    }
+
+    return true;
+  }
+
+  private async testConnection(): Promise<void> {
+    if (!this.client) {
+      throw new Error('Azure AI client not initialized');
+    }
+
+    try {
+      // Test with a simple language detection call
+      await this.client.detectLanguage(['test']);
+      logger.info('Azure AI connection test successful', 'azure-ai');
+    } catch (error) {
+      logger.error('Azure AI connection test failed', 'azure-ai', { error });
+      throw new Error('Failed to connect to Azure AI service');
+    }
+  }
+
+  private maskEndpoint(endpoint: string): string {
+    try {
+      const url = new URL(endpoint);
+      return `${url.protocol}//${url.hostname.substring(0, 4)}***${url.hostname.slice(-4)}${url.pathname}`;
+    } catch {
+      return '***';
     }
   }
 
