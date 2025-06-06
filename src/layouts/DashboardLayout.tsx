@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import useTranslation from '../hooks/useTranslation';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import GlobalSearch from '../components/GlobalSearch';
@@ -46,18 +46,20 @@ const DashboardLayout: React.FC = () => {
   }
   
   const navigation: NavigationItem[] = [
-    { name: t('dashboard.title'), path: '/', icon: LayoutDashboard },
-    { name: t('patients.title'), path: '/patients', icon: Users },
-    { name: t('appointments.title', 'Appointments'), path: '/appointments', icon: Calendar },
-    { name: t('messaging.title'), path: '/messaging', icon: MessageSquare },
-    { name: t('campaigns.title'), path: '/campaigns', icon: Megaphone },
-    { name: t('billing.title'), path: '/billing', icon: Receipt },
-    { name: t('reports.title'), path: '/reports', icon: BarChart3 },
-    { name: 'User Management', path: '/users', icon: UserCog, requiresPermission: { resource: 'users', action: PermissionAction.READ } },
-    { name: 'Accessibility', path: '/accessibility', icon: Eye },
-    { name: 'Mobile Testing', path: '/mobile-testing', icon: Smartphone },
-    { name: 'Integrations', path: '/integrations', icon: Zap },
-    { name: t('settings.title'), path: '/settings', icon: Settings },
+    { name: t('navigation.dashboard'), path: '/', icon: LayoutDashboard },
+    { name: t('navigation.patients'), path: '/patients', icon: Users },
+    { name: t('navigation.appointments'), path: '/appointments', icon: Calendar },
+    { name: t('navigation.messaging'), path: '/messaging', icon: MessageSquare },
+    { name: t('navigation.campaigns'), path: '/campaigns', icon: Megaphone },
+    { name: t('navigation.billing'), path: '/billing', icon: Receipt },
+    { name: t('navigation.reports'), path: '/reports', icon: BarChart3 },
+    { name: t('navigation.reportsAnalytics'), path: '/reports-analytics', icon: BarChart3 },
+    { name: t('navigation.backupRecovery'), path: '/backup-recovery', icon: Settings },
+    { name: t('navigation.userManagement'), path: '/users', icon: UserCog, requiresPermission: { resource: 'users', action: PermissionAction.READ } },
+    { name: t('navigation.accessibility'), path: '/accessibility', icon: Eye },
+    { name: t('navigation.mobileTesting'), path: '/mobile-testing', icon: Smartphone },
+    { name: t('navigation.integrations'), path: '/integrations', icon: Zap },
+    { name: t('navigation.settings'), path: '/settings', icon: Settings },
   ];
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);

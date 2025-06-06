@@ -16,9 +16,12 @@ import {
   Stethoscope,
   FileText,
   Shield,
-  Bell
+  Bell,
+  Eye,
+  Smartphone,
+  Globe
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import useTranslation from '../../hooks/useTranslation';
 
 export interface BreadcrumbItem {
   label: string;
@@ -50,6 +53,14 @@ const ROUTE_CONFIG: Record<string, { label: string; icon?: React.ReactNode }> = 
   'team': { label: 'team', icon: <Users size={14} /> },
   'services': { label: 'services', icon: <Stethoscope size={14} /> },
   'integrations': { label: 'integrations', icon: <Settings size={14} /> },
+  'users': { label: 'userManagement', icon: <Users size={14} /> },
+  'accessibility': { label: 'accessibility', icon: <Eye size={14} /> },
+  'mobile-testing': { label: 'mobileTesting', icon: <Smartphone size={14} /> },
+  'reports-analytics': { label: 'reportsAnalytics', icon: <BarChart3 size={14} /> },
+  'backup-recovery': { label: 'backupRecovery', icon: <Shield size={14} /> },
+  'i18n-test': { label: 'i18nTest', icon: <Globe size={14} /> },
+  'reports-test': { label: 'reportsTest', icon: <BarChart3 size={14} /> },
+  'backup-test': { label: 'backupTest', icon: <Shield size={14} /> },
   'invoices': { label: 'invoices', icon: <FileText size={14} /> },
   'payments': { label: 'payments', icon: <CreditCard size={14} /> },
   'claims': { label: 'claims', icon: <Shield size={14} /> },

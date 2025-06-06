@@ -4,6 +4,9 @@
 /* Import mobile styles */
 @import './styles/mobile.css';
 
+/* Import RTL styles */
+@import './styles/rtl.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

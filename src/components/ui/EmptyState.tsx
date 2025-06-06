@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
+import useTranslation from '../../hooks/useTranslation';
 import { 
   Users, 
   Calendar, 

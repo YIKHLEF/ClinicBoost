@@ -1,7 +1,7 @@
 import React, { useEffect, Suspense, lazy, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { QueryClientProvider } from '@tanstack/react-query';
+import useTranslation from './hooks/useTranslation';
 import { queryClient } from './lib/react-query';
 
 // Layouts (not lazy loaded as they're always needed)
@@ -16,6 +16,8 @@ const Messaging = lazy(() => import('./pages/Messaging'));
 const Campaigns = lazy(() => import('./pages/Campaigns'));
 const Billing = lazy(() => import('./pages/Billing'));
 const Reports = lazy(() => import('./pages/Reports'));
+const ReportsAnalytics = lazy(() => import('./pages/ReportsAnalytics'));
+const BackupRecovery = lazy(() => import('./pages/BackupRecovery'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Login = lazy(() => import('./pages/Login'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -48,6 +50,9 @@ import { ResponsiveProvider } from './hooks/useResponsive';
 import { ConfigTest } from './components/test/ConfigTest';
 import { AuthTest } from './components/test/AuthTest';
 import { EnvTest } from './components/test/EnvTest';
+import I18nTest from './components/test/I18nTest';
+import ReportsTest from './components/test/ReportsTest';
+import BackupTest from './components/test/BackupTest';
 
 // UI components
 import { DemoModeIndicator } from './components/ui/DemoModeIndicator';
@@ -130,6 +135,8 @@ const AppContent: React.FC = () => {
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="billing" element={<Billing />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="reports-analytics" element={<ReportsAnalytics />} />
+          <Route path="backup-recovery" element={<BackupRecovery />} />
           <Route path="settings" element={<Settings />} />
           <Route path="accessibility" element={<AccessibilityDashboard />} />
           <Route path="integrations" element={<IntegrationDashboard />} />
@@ -138,6 +145,9 @@ const AppContent: React.FC = () => {
           <Route path="config-test" element={<ConfigTest />} />
           <Route path="auth-test" element={<AuthTest />} />
           <Route path="env-test" element={<EnvTest />} />
+          <Route path="i18n-test" element={<I18nTest />} />
+          <Route path="reports-test" element={<ReportsTest />} />
+          <Route path="backup-test" element={<BackupTest />} />
           <Route path="test-connection" element={<TestConnection />} />
         </Route>
 
@@ -158,13 +168,13 @@ const AppContent: React.FC = () => {
 
 function App() {
   const location = useLocation();
-  const { i18n } = useTranslation();
+  const { i18n, getDirection } = useTranslation();
 
   // Set document direction based on language
   useEffect(() => {
-    document.documentElement.dir = i18n.dir();
+    document.documentElement.dir = getDirection();
     document.documentElement.lang = i18n.language;
-  }, [i18n.language]);
+  }, [i18n.language, getDirection]);
 
   // Scroll to top on route change
   useEffect(() => {
