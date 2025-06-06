@@ -22,4 +22,62 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
 .env
+.env.local
+.env.*.local
+
+# Testing
+coverage
+test-results
+playwright-report
+reports
+*.xml
+
+# Build artifacts
+build
+*.tgz
+*.tar.gz
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.cache
+.npm
+.eslintcache
+.stylelintcache
+
+# Temporary folders
+tmp
+temp
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+
+# Backup files
+backups/
+*.backup
+*.bak
+
+# Docker volumes
+postgres_data/
+redis_data/
+grafana_data/
+prometheus_data/
+elasticsearch_data/
+
+# Monitoring
+monitoring/data/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

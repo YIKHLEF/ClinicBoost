@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicboost-staging
+  labels:
+    name: clinicboost-staging
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicboost-production
+  labels:
+    name: clinicboost-production
+    environment: production

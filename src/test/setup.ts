@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, beforeAll, afterEach, afterAll } from 'vitest';
+import { server } from './mocks/server';
+import 'vitest-canvas-mock';
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
@@ -58,10 +60,31 @@ Object.defineProperty(window, 'sessionStorage', {
   value: sessionStorageMock,
 });
 
+// Setup MSW
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
 // Mock environment variables
 process.env.VITE_TWILIO_ACCOUNT_SID = 'test_account_sid';
 process.env.VITE_TWILIO_AUTH_TOKEN = 'test_auth_token';
 process.env.VITE_TWILIO_PHONE_NUMBER = '+1234567890';
+process.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
+process.env.VITE_SUPABASE_ANON_KEY = 'test_anon_key';
+process.env.VITE_STRIPE_PUBLISHABLE_KEY = 'pk_test_123';
+
+// Mock crypto for Node.js environment
+Object.defineProperty(global, 'crypto', {
+  value: {
+    randomUUID: () => 'test-uuid-' + Math.random().toString(36).substr(2, 9),
+    getRandomValues: (arr: any) => {
+      for (let i = 0; i < arr.length; i++) {
+        arr[i] = Math.floor(Math.random() * 256);
+      }
+      return arr;
+    },
+  },
+});
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
