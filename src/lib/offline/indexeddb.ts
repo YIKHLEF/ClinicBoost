@@ -200,6 +200,108 @@ class IndexedDBManager {
       this.db = null;
     }
   }
+
+  /**
+   * Calculate storage size for a specific store
+   */
+  async getStoreSize(storeName: string): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const allData = await this.getAll(storeName);
+    let totalSize = 0;
+
+    for (const item of allData) {
+      totalSize += this.calculateObjectSize(item);
+    }
+
+    return totalSize;
+  }
+
+  /**
+   * Calculate total storage size across all stores
+   */
+  async getTotalStorageSize(): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stores = ['patients', 'appointments', 'treatments', 'clinics', 'syncQueue', 'settings'];
+    let totalSize = 0;
+
+    for (const storeName of stores) {
+      try {
+        const storeSize = await this.getStoreSize(storeName);
+        totalSize += storeSize;
+      } catch (error) {
+        // Store might not exist, continue with others
+        console.warn(`Failed to calculate size for store ${storeName}:`, error);
+      }
+    }
+
+    return totalSize;
+  }
+
+  /**
+   * Calculate the size of an object in bytes
+   */
+  private calculateObjectSize(obj: any): number {
+    if (obj === null || obj === undefined) return 0;
+
+    if (typeof obj === 'string') {
+      return obj.length * 2; // UTF-16 characters
+    }
+
+    if (typeof obj === 'number') {
+      return 8; // 64-bit number
+    }
+
+    if (typeof obj === 'boolean') {
+      return 4; // Boolean value
+    }
+
+    if (obj instanceof Date) {
+      return 8; // Date object
+    }
+
+    if (Array.isArray(obj)) {
+      let size = 0;
+      for (const item of obj) {
+        size += this.calculateObjectSize(item);
+      }
+      return size + (obj.length * 8); // Array overhead
+    }
+
+    if (typeof obj === 'object') {
+      let size = 0;
+      for (const [key, value] of Object.entries(obj)) {
+        size += key.length * 2; // Key size (UTF-16)
+        size += this.calculateObjectSize(value); // Value size
+        size += 16; // Property overhead
+      }
+      return size + 32; // Object overhead
+    }
+
+    return 0;
+  }
+
+  /**
+   * Get storage statistics for a specific store
+   */
+  async getStoreStats(storeName: string): Promise<{
+    itemCount: number;
+    storageSize: number;
+    unsyncedCount: number;
+  }> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const allData = await this.getAll(storeName);
+    const unsyncedData = allData.filter(item => !item.synced);
+    const storageSize = await this.getStoreSize(storeName);
+
+    return {
+      itemCount: allData.length,
+      storageSize,
+      unsyncedCount: unsyncedData.length,
+    };
+  }
 }
 
 export const indexedDBManager = new IndexedDBManager();

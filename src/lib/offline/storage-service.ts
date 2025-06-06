@@ -245,25 +245,106 @@ class OfflineStorageService {
     storageSize: number;
   }> {
     await this.init();
-    
+
     const stores = ['patients', 'appointments', 'treatments', 'clinics'];
     let totalItems = 0;
     let unsyncedItems = 0;
-    
+
     for (const storeName of stores) {
       const allData = await indexedDBManager.getAll(storeName);
       totalItems += allData.length;
       unsyncedItems += allData.filter(item => !item.synced).length;
     }
-    
+
     const syncQueue = await this.getSyncQueue();
-    
+
+    // Calculate actual storage size
+    const storageSize = await indexedDBManager.getTotalStorageSize();
+
     return {
       totalItems,
       unsyncedItems,
       syncQueueSize: syncQueue.length,
-      storageSize: 0, // TODO: Calculate actual storage size
+      storageSize,
     };
+  }
+
+  /**
+   * Get detailed storage statistics by store
+   */
+  async getDetailedStorageStats(): Promise<{
+    totalStats: {
+      totalItems: number;
+      unsyncedItems: number;
+      syncQueueSize: number;
+      storageSize: number;
+    };
+    storeStats: Record<string, {
+      itemCount: number;
+      storageSize: number;
+      unsyncedCount: number;
+    }>;
+  }> {
+    await this.init();
+
+    const stores = ['patients', 'appointments', 'treatments', 'clinics'];
+    const storeStats: Record<string, any> = {};
+    let totalItems = 0;
+    let unsyncedItems = 0;
+    let totalStorageSize = 0;
+
+    for (const storeName of stores) {
+      const stats = await indexedDBManager.getStoreStats(storeName);
+      storeStats[storeName] = stats;
+      totalItems += stats.itemCount;
+      unsyncedItems += stats.unsyncedCount;
+      totalStorageSize += stats.storageSize;
+    }
+
+    const syncQueue = await this.getSyncQueue();
+    const syncQueueSize = await indexedDBManager.getStoreSize('syncQueue');
+    totalStorageSize += syncQueueSize;
+
+    return {
+      totalStats: {
+        totalItems,
+        unsyncedItems,
+        syncQueueSize: syncQueue.length,
+        storageSize: totalStorageSize,
+      },
+      storeStats,
+    };
+  }
+
+  /**
+   * Format storage size in human-readable format
+   */
+  formatStorageSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
+  }
+
+  /**
+   * Get storage usage percentage (if quota is available)
+   */
+  async getStorageUsagePercentage(): Promise<number | null> {
+    try {
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        const estimate = await navigator.storage.estimate();
+        if (estimate.quota && estimate.usage) {
+          return (estimate.usage / estimate.quota) * 100;
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to get storage quota estimate', 'offline-storage', { error });
+    }
+
+    return null;
   }
 }
 
