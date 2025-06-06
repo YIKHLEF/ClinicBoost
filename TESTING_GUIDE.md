@@ -346,6 +346,109 @@ const restoreNetwork = simulateSlowNetwork();
 restoreNetwork();
 ```
 
+## Load Testing
+
+### Setup
+```bash
+# Install Artillery
+npm install --save-dev artillery
+
+# Run load tests
+npm run test:load
+```
+
+### Configuration
+Load tests are configured in `src/test/load/load-test-config.yml`:
+
+```yaml
+config:
+  target: 'http://localhost:5173'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm-up"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+```
+
+### Scenarios
+- Authentication flow
+- Patient management
+- Appointment scheduling
+- Dashboard data loading
+- Search functionality
+- Billing operations
+- Reports generation
+
+## Accessibility Testing
+
+### Automated Testing
+```bash
+# Run accessibility tests
+npm run test:accessibility
+npm run test:e2e:accessibility
+```
+
+### Manual Testing
+- Screen reader compatibility
+- Keyboard navigation
+- Color contrast
+- Focus management
+- ARIA attributes
+
+### Tools Used
+- axe-core for automated testing
+- jest-axe for unit tests
+- @axe-core/playwright for E2E tests
+
+## Performance Testing
+
+### Component Performance
+```bash
+# Run performance tests
+npm run test:performance
+```
+
+### Metrics Tracked
+- Render time
+- Memory usage
+- Bundle size
+- Network requests
+- Core Web Vitals
+
+### Benchmarks
+- Component rendering: < 100ms
+- API responses: < 2s
+- Bundle size: < 1MB
+- Memory leaks: < 5MB increase
+
+## Test Automation
+
+### Comprehensive Testing
+```bash
+# Run all tests
+npm run test:full
+
+# Run specific test suite
+node scripts/test-automation.js unit
+node scripts/test-automation.js accessibility
+node scripts/test-automation.js performance
+```
+
+### Coverage Analysis
+```bash
+# Generate detailed coverage report
+node scripts/test-coverage-report.js
+```
+
+### CI/CD Integration
+Tests run automatically on:
+- Pull requests
+- Pushes to main/develop
+- Nightly builds
+- Pre-deployment
+
 ## Resources
 
 - [Vitest Documentation](https://vitest.dev/)

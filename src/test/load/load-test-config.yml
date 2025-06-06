@@ -1,0 +1,230 @@
+config:
+  target: 'http://localhost:5173'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm-up"
+    # Ramp-up phase
+    - duration: 120
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp-up load"
+    # Sustained load phase
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    # Peak load phase
+    - duration: 120
+      arrivalRate: 100
+      name: "Peak load"
+    # Cool-down phase
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool-down"
+  
+  # Performance thresholds
+  ensure:
+    - http.response_time.p95: 2000  # 95th percentile response time < 2s
+    - http.response_time.p99: 5000  # 99th percentile response time < 5s
+    - http.request_rate: 45         # At least 45 requests per second
+    - http.codes.200: 95            # 95% success rate
+
+  # Load testing plugins
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    
+  # Environment variables
+  variables:
+    apiBaseUrl: "{{ $processEnvironment.VITE_SUPABASE_URL }}"
+    authToken: "{{ $processEnvironment.TEST_AUTH_TOKEN }}"
+
+scenarios:
+  # Authentication flow load test
+  - name: "Authentication Load Test"
+    weight: 20
+    flow:
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "loadtest{{ $randomInt(1, 1000) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+      - think: 2
+
+  # Patient management load test
+  - name: "Patient Management Load Test"
+    weight: 30
+    flow:
+      # Get patients list
+      - get:
+          url: "/rest/v1/patients"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          capture:
+            - json: "$[0].id"
+              as: "patientId"
+      
+      # Create new patient
+      - post:
+          url: "/rest/v1/patients"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            first_name: "LoadTest{{ $randomInt(1, 10000) }}"
+            last_name: "Patient{{ $randomInt(1, 10000) }}"
+            email: "patient{{ $randomInt(1, 10000) }}@example.com"
+            phone: "+212{{ $randomInt(600000000, 799999999) }}"
+            date_of_birth: "1990-01-01"
+          capture:
+            - json: "$.id"
+              as: "newPatientId"
+      
+      # Update patient
+      - patch:
+          url: "/rest/v1/patients?id=eq.{{ newPatientId }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            phone: "+212{{ $randomInt(600000000, 799999999) }}"
+      
+      - think: 1
+
+  # Appointment scheduling load test
+  - name: "Appointment Scheduling Load Test"
+    weight: 25
+    flow:
+      # Get available slots
+      - get:
+          url: "/rest/v1/appointments?select=*&date=gte.{{ $moment().format('YYYY-MM-DD') }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+      
+      # Create appointment
+      - post:
+          url: "/rest/v1/appointments"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            patient_id: "{{ patientId }}"
+            date: "{{ $moment().add(1, 'days').format('YYYY-MM-DD') }}"
+            time: "{{ $randomInt(9, 17) }}:00"
+            type: "consultation"
+            status: "scheduled"
+      
+      - think: 2
+
+  # Dashboard data load test
+  - name: "Dashboard Data Load Test"
+    weight: 15
+    flow:
+      # Get dashboard stats
+      - get:
+          url: "/rest/v1/rpc/get_dashboard_stats"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+      
+      # Get recent appointments
+      - get:
+          url: "/rest/v1/appointments?select=*,patients(*)&order=created_at.desc&limit=10"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+      
+      # Get patient count
+      - get:
+          url: "/rest/v1/patients?select=count"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+      
+      - think: 1
+
+  # Search functionality load test
+  - name: "Search Load Test"
+    weight: 10
+    flow:
+      # Search patients
+      - get:
+          url: "/rest/v1/patients?or=(first_name.ilike.*test*,last_name.ilike.*test*,email.ilike.*test*)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      # Search appointments
+      - get:
+          url: "/rest/v1/appointments?select=*,patients(*)&patients.first_name.ilike.*test*"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      - think: 1
+
+  # Billing and payments load test
+  - name: "Billing Load Test"
+    weight: 8
+    flow:
+      # Get billing records
+      - get:
+          url: "/rest/v1/billing?select=*,patients(*)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      # Create invoice
+      - post:
+          url: "/rest/v1/billing"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            patient_id: "{{ patientId }}"
+            amount: "{{ $randomInt(50, 500) }}"
+            description: "Consultation fee"
+            status: "pending"
+            due_date: "{{ $moment().add(30, 'days').format('YYYY-MM-DD') }}"
+
+      - think: 2
+
+  # Reports and analytics load test
+  - name: "Reports Load Test"
+    weight: 7
+    flow:
+      # Get revenue report
+      - get:
+          url: "/rest/v1/rpc/get_revenue_report?start_date={{ $moment().subtract(30, 'days').format('YYYY-MM-DD') }}&end_date={{ $moment().format('YYYY-MM-DD') }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      # Get appointment statistics
+      - get:
+          url: "/rest/v1/rpc/get_appointment_stats?period=month"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      # Get patient demographics
+      - get:
+          url: "/rest/v1/rpc/get_patient_demographics"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+
+      - think: 3

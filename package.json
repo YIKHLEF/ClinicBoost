@@ -29,7 +29,12 @@
     "test:e2e:staging": "playwright test --config=playwright.staging.config.ts",
     "test:e2e:production": "playwright test --config=playwright.production.config.ts",
     "test:performance": "vitest run src/**/*.performance.test.{ts,tsx}",
+    "test:load": "artillery run src/test/load/load-test-config.yml",
+    "test:accessibility": "vitest run src/**/*.accessibility.test.{ts,tsx}",
+    "test:e2e:accessibility": "playwright test e2e/accessibility.spec.ts",
+    "test:e2e:performance": "playwright test e2e/performance.spec.ts",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:full": "npm run test:all && npm run test:accessibility && npm run test:performance && npm run test:load",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=test-results.xml",
     "docker:build": "docker build -t clinicboost .",
     "docker:build:staging": "docker build -t clinicboost:staging --build-arg NODE_ENV=staging .",
@@ -138,6 +143,10 @@
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^1.3.1",
     "vitest-canvas-mock": "^0.3.3",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "artillery": "^2.0.0",
+    "@axe-core/playwright": "^4.8.0",
+    "axe-core": "^4.8.0",
+    "jest-axe": "^8.0.0"
   }
 }
