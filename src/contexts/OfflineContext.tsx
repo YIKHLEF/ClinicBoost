@@ -4,6 +4,7 @@ import { offlineStorageService } from '../lib/offline/storage-service';
 import { syncService, type SyncResult } from '../lib/offline/sync-service';
 import { logger } from '../lib/logging-monitoring';
 import { useToast } from '../components/ui/Toast';
+import type { SyncConflict } from '../components/offline/SyncConflictResolver';
 
 interface OfflineContextType {
   // Network status
@@ -16,7 +17,8 @@ interface OfflineContextType {
   lastSyncTime: number | null;
   pendingOperations: number;
   syncErrors: Array<{ operation: any; error: string }>;
-  
+  syncConflicts: SyncConflict[];
+
   // Storage stats
   storageStats: {
     totalItems: number;
@@ -24,13 +26,15 @@ interface OfflineContextType {
     syncQueueSize: number;
     storageSize: number;
   } | null;
-  
+
   // Actions
   triggerSync: () => Promise<SyncResult>;
   clearOfflineData: () => Promise<void>;
   enableAutoSync: () => void;
   disableAutoSync: () => void;
   refreshStorageStats: () => Promise<void>;
+  resolveSyncConflict: (conflictId: string, resolution: 'local' | 'server' | 'merge', mergedData?: any) => Promise<void>;
+  resolveAllSyncConflicts: (resolution: 'local' | 'server') => Promise<void>;
 }
 
 const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
@@ -59,6 +63,7 @@ export const OfflineProvider: React.FC<OfflineProviderProps> = ({
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [pendingOperations, setPendingOperations] = useState(0);
   const [syncErrors, setSyncErrors] = useState<Array<{ operation: any; error: string }>>([]);
+  const [syncConflicts, setSyncConflicts] = useState<SyncConflict[]>([]);
   const [storageStats, setStorageStats] = useState<OfflineContextType['storageStats']>(null);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
@@ -208,27 +213,109 @@ export const OfflineProvider: React.FC<OfflineProviderProps> = ({
     logger.info('Auto-sync disabled', 'offline-context');
   };
 
+  const resolveSyncConflict = async (
+    conflictId: string,
+    resolution: 'local' | 'server' | 'merge',
+    mergedData?: any
+  ): Promise<void> => {
+    try {
+      // Find the conflict
+      const conflict = syncConflicts.find(c => c.id === conflictId);
+      if (!conflict) {
+        throw new Error('Conflict not found');
+      }
+
+      // Apply resolution
+      let resolvedData: any;
+      switch (resolution) {
+        case 'local':
+          resolvedData = conflict.localData;
+          break;
+        case 'server':
+          resolvedData = conflict.serverData;
+          break;
+        case 'merge':
+          resolvedData = mergedData || { ...conflict.serverData, ...conflict.localData };
+          break;
+      }
+
+      // Update the record in offline storage
+      await offlineStorageService.store(conflict.table, conflict.recordId, resolvedData, true);
+
+      // Remove the conflict from the list
+      setSyncConflicts(prev => prev.filter(c => c.id !== conflictId));
+
+      logger.info('Sync conflict resolved', 'offline-context', {
+        conflictId,
+        resolution,
+        table: conflict.table,
+        recordId: conflict.recordId
+      });
+
+      addToast({
+        type: 'success',
+        title: 'Conflict Resolved',
+        message: 'The sync conflict has been resolved successfully.',
+      });
+    } catch (error) {
+      logger.error('Failed to resolve sync conflict', 'offline-context', { error, conflictId });
+      addToast({
+        type: 'error',
+        title: 'Resolution Failed',
+        message: 'Failed to resolve the conflict. Please try again.',
+      });
+      throw error;
+    }
+  };
+
+  const resolveAllSyncConflicts = async (resolution: 'local' | 'server'): Promise<void> => {
+    try {
+      const conflictPromises = syncConflicts.map(conflict =>
+        resolveSyncConflict(conflict.id, resolution)
+      );
+
+      await Promise.all(conflictPromises);
+
+      addToast({
+        type: 'success',
+        title: 'All Conflicts Resolved',
+        message: 'All sync conflicts have been resolved successfully.',
+      });
+    } catch (error) {
+      logger.error('Failed to resolve all conflicts', 'offline-context', { error });
+      addToast({
+        type: 'error',
+        title: 'Resolution Failed',
+        message: 'Failed to resolve all conflicts. Please try again.',
+      });
+      throw error;
+    }
+  };
+
   const value: OfflineContextType = {
     // Network status
     isOnline: networkStatus.isOnline,
     isOffline: !networkStatus.isOnline,
     networkStatus,
-    
+
     // Sync status
     isSyncing,
     lastSyncTime,
     pendingOperations,
     syncErrors,
-    
+    syncConflicts,
+
     // Storage stats
     storageStats,
-    
+
     // Actions
     triggerSync,
     clearOfflineData,
     enableAutoSync,
     disableAutoSync,
     refreshStorageStats,
+    resolveSyncConflict,
+    resolveAllSyncConflicts,
   };
 
   return (

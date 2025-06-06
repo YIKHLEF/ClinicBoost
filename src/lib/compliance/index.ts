@@ -156,6 +156,30 @@ export class ComplianceService {
   }
 
   /**
+   * Get total users count from the database
+   */
+  private async getTotalUsersCount(): Promise<number> {
+    try {
+      // Import supabase here to avoid circular dependencies
+      const { supabase } = await import('../supabase');
+
+      const { count, error } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) {
+        logger.warn('Failed to get total users count', 'compliance-service', { error });
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      logger.warn('Failed to get total users count', 'compliance-service', { error });
+      return 0;
+    }
+  }
+
+  /**
    * Get compliance metrics for dashboard
    */
   async getComplianceMetrics(): Promise<ComplianceMetrics> {
@@ -200,10 +224,10 @@ export class ComplianceService {
           lastRun: retentionJobs.length > 0 ? new Date(retentionJobs[0].created_at) : new Date()
         },
         consentMetrics: {
-          totalUsers: 0, // TODO: Calculate from user base
-          consentRate: consentStats.totalConsents > 0 ? 
+          totalUsers: await this.getTotalUsersCount(),
+          consentRate: consentStats.totalConsents > 0 ?
             (consentStats.consentsByStatus.granted / consentStats.totalConsents) * 100 : 0,
-          withdrawalRate: consentStats.totalConsents > 0 ? 
+          withdrawalRate: consentStats.totalConsents > 0 ?
             (consentStats.consentsByStatus.withdrawn / consentStats.totalConsents) * 100 : 0
         }
       };

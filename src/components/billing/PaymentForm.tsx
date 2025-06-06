@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CreditCard, Lock, AlertCircle } from 'lucide-react';
+import { CreditCard, Lock, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useToast } from '../ui/Toast';
 import { formatAmount, mockCreatePaymentIntent, mockConfirmPayment } from '../../lib/stripe';
+import { paymentErrorHandler } from '../../lib/payment/error-handling';
+import { withTimeout } from '../../lib/error-handling';
 
 interface PaymentFormProps {
   amount: number;
@@ -43,6 +45,22 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const [errors, setErrors] = useState<Partial<CardDetails>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Monitor network status
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const validateCard = (): boolean => {
     const newErrors: Partial<CardDetails> = {};
@@ -135,24 +153,67 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Clear previous errors
+    setPaymentError(null);
+
     if (!validateCard()) {
+      return;
+    }
+
+    // Check network connectivity
+    if (!isOnline) {
+      setPaymentError(t('payment.offlineError', 'Payment requires an internet connection. Please check your connection and try again.'));
+      return;
+    }
+
+    // Validate payment data
+    const validationError = paymentErrorHandler.validatePaymentData({
+      amount,
+      currency,
+      paymentMethodId: 'card', // Mock payment method
+    });
+
+    if (validationError) {
+      setPaymentError(paymentErrorHandler.getUserMessage(validationError));
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Create payment intent
-      const paymentIntent = await mockCreatePaymentIntent({
-        amount: amount * 100, // Convert to cents
-        currency: currency.toLowerCase(),
-        patientId,
-        invoiceId,
-        description,
-      });
+      // Process payment with comprehensive error handling
+      const result = await paymentErrorHandler.processPaymentWithErrorHandling(
+        async () => {
+          // Create payment intent with timeout
+          const paymentIntent = await withTimeout(
+            mockCreatePaymentIntent({
+              amount: amount * 100, // Convert to cents
+              currency: currency.toLowerCase(),
+              patientId,
+              invoiceId,
+              description,
+            }),
+            30000 // 30 second timeout
+          );
 
-      // Simulate payment confirmation
-      const result = await mockConfirmPayment();
+          // Confirm payment with timeout
+          const confirmResult = await withTimeout(
+            mockConfirmPayment(),
+            30000 // 30 second timeout
+          );
+
+          if (!confirmResult.success) {
+            throw new Error('Payment confirmation failed');
+          }
+
+          return { paymentIntent, confirmResult };
+        },
+        {
+          timeout: 60000, // 60 second total timeout
+          retries: 2,
+          retryDelay: 2000
+        }
+      );
 
       if (result.success) {
         addToast({
@@ -160,15 +221,26 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           title: t('payment.success', 'Payment Successful'),
           message: t('payment.successMessage', 'Your payment has been processed successfully.'),
         });
-        onSuccess(paymentIntent.id);
-      } else {
-        throw new Error('Payment failed');
+        onSuccess(result.data.paymentIntent.id);
+      } else if (result.error) {
+        const errorMessage = paymentErrorHandler.getUserMessage(result.error);
+        setPaymentError(errorMessage);
+
+        addToast({
+          type: 'error',
+          title: t('payment.failed', 'Payment Failed'),
+          message: errorMessage,
+        });
       }
     } catch (error: any) {
+      const paymentError = paymentErrorHandler.handlePaymentError(error);
+      const errorMessage = paymentErrorHandler.getUserMessage(paymentError);
+
+      setPaymentError(errorMessage);
       addToast({
         type: 'error',
         title: t('payment.failed', 'Payment Failed'),
-        message: error.message || t('payment.failedMessage', 'There was an error processing your payment.'),
+        message: errorMessage,
       });
     } finally {
       setIsProcessing(false);
@@ -195,8 +267,37 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
             {t('payment.securePayment', 'Secure Payment')}
           </h2>
           <Lock className="text-green-500" size={16} />
+          {isOnline ? (
+            <Wifi className="text-green-500" size={16} title={t('payment.online', 'Online')} />
+          ) : (
+            <WifiOff className="text-red-500" size={16} title={t('payment.offline', 'Offline')} />
+          )}
         </div>
       </div>
+
+      {/* Network Status Warning */}
+      {!isOnline && (
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg">
+          <div className="flex items-center">
+            <WifiOff className="text-red-500 mr-2" size={16} />
+            <span className="text-sm text-red-700 dark:text-red-300">
+              {t('payment.offlineWarning', 'No internet connection. Payment processing is not available.')}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Error Display */}
+      {paymentError && (
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="text-red-500 mr-2 mt-0.5" size={16} />
+            <span className="text-sm text-red-700 dark:text-red-300">
+              {paymentError}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
         <div className="flex justify-between items-center">
@@ -333,10 +434,13 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           <Button
             type="submit"
             loading={isProcessing}
+            disabled={isProcessing || !isOnline}
             className="flex-1"
           >
-            {isProcessing 
+            {isProcessing
               ? t('payment.processing', 'Processing...')
+              : !isOnline
+              ? t('payment.offlineDisabled', 'Payment Unavailable (Offline)')
               : t('payment.payNow', `Pay ${formatAmount(amount * 100, currency)}`)
             }
           </Button>
