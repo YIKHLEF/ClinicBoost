@@ -6,7 +6,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import GlobalSearch from '../components/GlobalSearch';
 import { Breadcrumbs } from '../components/ui/Breadcrumbs';
-import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone, Shield } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useRBAC } from '../hooks/useRBAC';
 import { PermissionAction } from '../lib/user-management/user-service';
@@ -55,6 +55,7 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.reports'), path: '/reports', icon: BarChart3 },
     { name: t('navigation.reportsAnalytics'), path: '/reports-analytics', icon: BarChart3 },
     { name: t('navigation.backupRecovery'), path: '/backup-recovery', icon: Settings },
+    { name: t('navigation.compliance'), path: '/compliance', icon: Shield, requiresPermission: { resource: 'compliance', action: PermissionAction.READ } },
     { name: t('navigation.userManagement'), path: '/users', icon: UserCog, requiresPermission: { resource: 'users', action: PermissionAction.READ } },
     { name: t('navigation.accessibility'), path: '/accessibility', icon: Eye },
     { name: t('navigation.mobileTesting'), path: '/mobile-testing', icon: Smartphone },

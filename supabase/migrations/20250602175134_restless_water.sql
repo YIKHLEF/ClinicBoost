@@ -364,6 +364,26 @@ CREATE TRIGGER audit_patients_changes
     FOR EACH ROW
     EXECUTE FUNCTION audit_log_changes();
 
+CREATE TRIGGER audit_users_changes
+    AFTER INSERT OR UPDATE OR DELETE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_log_changes();
+
+CREATE TRIGGER audit_appointments_changes
+    AFTER INSERT OR UPDATE OR DELETE ON appointments
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_log_changes();
+
+CREATE TRIGGER audit_treatments_changes
+    AFTER INSERT OR UPDATE OR DELETE ON treatments
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_log_changes();
+
+CREATE TRIGGER audit_invoices_changes
+    AFTER INSERT OR UPDATE OR DELETE ON invoices
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_log_changes();
+
 CREATE TRIGGER audit_appointments_changes
     AFTER INSERT OR UPDATE OR DELETE ON appointments
     FOR EACH ROW

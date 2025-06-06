@@ -19,6 +19,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const ReportsAnalytics = lazy(() => import('./pages/ReportsAnalytics'));
 const BackupRecovery = lazy(() => import('./pages/BackupRecovery'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Compliance = lazy(() => import('./pages/Compliance'));
 const Login = lazy(() => import('./pages/Login'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const TestConnection = lazy(() => import('./pages/TestConnection'));
@@ -56,6 +57,7 @@ import BackupTest from './components/test/BackupTest';
 
 // UI components
 import { DemoModeIndicator } from './components/ui/DemoModeIndicator';
+import { ConsentBanner } from './components/compliance/ConsentBanner';
 
 // Initialize accessibility features
 import { ariaManager } from './lib/accessibility/aria-attributes';
@@ -137,6 +139,7 @@ const AppContent: React.FC = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="reports-analytics" element={<ReportsAnalytics />} />
           <Route path="backup-recovery" element={<BackupRecovery />} />
+          <Route path="compliance" element={<Compliance />} />
           <Route path="settings" element={<Settings />} />
           <Route path="accessibility" element={<AccessibilityDashboard />} />
           <Route path="integrations" element={<IntegrationDashboard />} />
@@ -162,6 +165,9 @@ const AppContent: React.FC = () => {
           onSkip={handleOnboardingSkip}
         />
       )}
+
+      {/* Consent Banner */}
+      <ConsentBanner />
     </>
   );
 };
