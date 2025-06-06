@@ -180,7 +180,7 @@ export interface DataConflict {
   resolved: boolean;
 }
 
-class EHRPMSManager {
+export class EHRPMSManager {
   private providers: Map<string, EHRProvider> = new Map();
   private syncIntervals: Map<string, NodeJS.Timeout> = new Map();
   private isInitialized = false;
@@ -678,24 +678,489 @@ class EHRPMSManager {
    * Sync patients
    */
   private async syncPatients(provider: EHRProvider, result: SyncResult): Promise<void> {
-    // Implementation for syncing patient data
-    // This would fetch patients from the EHR and sync with clinic database
+    try {
+      // Fetch patients from EHR
+      const ehrPatients = await this.fetchEHRPatients(provider);
+
+      // Import supabase here to avoid circular dependencies
+      const { supabase } = await import('../supabase');
+
+      for (const ehrPatient of ehrPatients) {
+        try {
+          // Check if patient already exists
+          const { data: existingPatients } = await supabase
+            .from('patients')
+            .select('id, updated_at')
+            .or(`email.eq.${ehrPatient.email},phone.eq.${ehrPatient.phone}`)
+            .limit(1);
+
+          if (existingPatients && existingPatients.length > 0) {
+            // Update existing patient if EHR data is newer
+            const existingPatient = existingPatients[0];
+            if (ehrPatient.lastUpdated > new Date(existingPatient.updated_at)) {
+              const { error } = await supabase
+                .from('patients')
+                .update({
+                  first_name: ehrPatient.firstName,
+                  last_name: ehrPatient.lastName,
+                  email: ehrPatient.email,
+                  phone: ehrPatient.phone,
+                  date_of_birth: ehrPatient.dateOfBirth.toISOString().split('T')[0],
+                  gender: ehrPatient.gender,
+                  address: ehrPatient.address ?
+                    `${ehrPatient.address.street}, ${ehrPatient.address.city}, ${ehrPatient.address.state} ${ehrPatient.address.zipCode}` : null,
+                  medical_history: {
+                    allergies: ehrPatient.allergies || [],
+                    medications: ehrPatient.medications || [],
+                    conditions: ehrPatient.medicalHistory || [],
+                    source: 'ehr',
+                    lastSync: new Date().toISOString(),
+                  },
+                  notes: `Synced from ${provider.name} on ${new Date().toISOString()}`,
+                })
+                .eq('id', existingPatient.id);
+
+              if (!error) {
+                result.recordsUpdated++;
+              } else {
+                result.errors.push(`Failed to update patient ${ehrPatient.firstName} ${ehrPatient.lastName}: ${error.message}`);
+              }
+            } else {
+              result.recordsSkipped++;
+            }
+          } else {
+            // Create new patient
+            const { error } = await supabase
+              .from('patients')
+              .insert({
+                first_name: ehrPatient.firstName,
+                last_name: ehrPatient.lastName,
+                email: ehrPatient.email,
+                phone: ehrPatient.phone,
+                date_of_birth: ehrPatient.dateOfBirth.toISOString().split('T')[0],
+                gender: ehrPatient.gender,
+                address: ehrPatient.address ?
+                  `${ehrPatient.address.street}, ${ehrPatient.address.city}, ${ehrPatient.address.state} ${ehrPatient.address.zipCode}` : null,
+                medical_history: {
+                  allergies: ehrPatient.allergies || [],
+                  medications: ehrPatient.medications || [],
+                  conditions: ehrPatient.medicalHistory || [],
+                  source: 'ehr',
+                  lastSync: new Date().toISOString(),
+                },
+                notes: `Imported from ${provider.name} on ${new Date().toISOString()}`,
+                status: 'active',
+              });
+
+            if (!error) {
+              result.recordsCreated++;
+            } else {
+              result.errors.push(`Failed to create patient ${ehrPatient.firstName} ${ehrPatient.lastName}: ${error.message}`);
+            }
+          }
+
+          result.recordsProcessed++;
+        } catch (error) {
+          result.errors.push(`Error processing patient ${ehrPatient.firstName} ${ehrPatient.lastName}: ${error}`);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync patients from EHR', 'ehr-pms', { error, providerId: provider.id });
+      result.errors.push(`Patient sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
    * Sync appointments
    */
   private async syncAppointments(provider: EHRProvider, result: SyncResult): Promise<void> {
-    // Implementation for syncing appointment data
-    // This would fetch appointments from the EHR and sync with clinic database
+    try {
+      // Fetch appointments from EHR
+      const ehrAppointments = await this.fetchEHRAppointments(provider);
+
+      const { supabase } = await import('../supabase');
+
+      for (const ehrAppointment of ehrAppointments) {
+        try {
+          // Check if appointment already exists
+          const { data: existingAppointments } = await supabase
+            .from('appointments')
+            .select('id, updated_at')
+            .eq('start_time', ehrAppointment.startTime.toISOString())
+            .limit(1);
+
+          if (existingAppointments && existingAppointments.length > 0) {
+            // Update existing appointment if EHR data is newer
+            const existingAppointment = existingAppointments[0];
+            if (ehrAppointment.lastUpdated > new Date(existingAppointment.updated_at)) {
+              const { error } = await supabase
+                .from('appointments')
+                .update({
+                  title: ehrAppointment.appointmentType,
+                  description: ehrAppointment.reasonForVisit,
+                  start_time: ehrAppointment.startTime.toISOString(),
+                  end_time: ehrAppointment.endTime.toISOString(),
+                  status: this.mapEHRAppointmentStatus(ehrAppointment.status),
+                  notes: `${ehrAppointment.notes || ''}\nSynced from ${provider.name}`,
+                })
+                .eq('id', existingAppointment.id);
+
+              if (!error) {
+                result.recordsUpdated++;
+              } else {
+                result.errors.push(`Failed to update appointment: ${error.message}`);
+              }
+            } else {
+              result.recordsSkipped++;
+            }
+          } else {
+            // Create new appointment
+            const { error } = await supabase
+              .from('appointments')
+              .insert({
+                title: ehrAppointment.appointmentType,
+                description: ehrAppointment.reasonForVisit,
+                start_time: ehrAppointment.startTime.toISOString(),
+                end_time: ehrAppointment.endTime.toISOString(),
+                status: this.mapEHRAppointmentStatus(ehrAppointment.status),
+                notes: `${ehrAppointment.notes || ''}\nImported from ${provider.name}`,
+              });
+
+            if (!error) {
+              result.recordsCreated++;
+            } else {
+              result.errors.push(`Failed to create appointment: ${error.message}`);
+            }
+          }
+
+          result.recordsProcessed++;
+        } catch (error) {
+          result.errors.push(`Error processing appointment: ${error}`);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync appointments from EHR', 'ehr-pms', { error, providerId: provider.id });
+      result.errors.push(`Appointment sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
    * Sync medical records
    */
   private async syncMedicalRecords(provider: EHRProvider, result: SyncResult): Promise<void> {
-    // Implementation for syncing medical record data
-    // This would fetch medical records from the EHR and sync with clinic database
+    try {
+      // Medical records sync would typically involve updating patient medical history
+      // This is a complex operation that would require careful mapping of EHR data structures
+
+      logger.info('Medical records sync initiated', 'ehr-pms', { providerId: provider.id });
+
+      // For now, we'll mark this as processed but not implement the full sync
+      // In a production system, this would involve:
+      // 1. Fetching medical records from EHR
+      // 2. Mapping EHR data structures to clinic format
+      // 3. Updating patient medical_history JSONB field
+      // 4. Handling conflicts and versioning
+
+      result.recordsProcessed = 0; // No records processed yet
+      result.recordsSkipped = 0;
+
+      logger.info('Medical records sync completed (placeholder)', 'ehr-pms', { providerId: provider.id });
+    } catch (error) {
+      logger.error('Failed to sync medical records from EHR', 'ehr-pms', { error, providerId: provider.id });
+      result.errors.push(`Medical records sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Fetch patients from EHR system
+   */
+  private async fetchEHRPatients(provider: EHRProvider): Promise<PatientRecord[]> {
+    const patients: PatientRecord[] = [];
+
+    try {
+      let url = '';
+      let headers: Record<string, string> = {};
+
+      switch (provider.type) {
+        case 'epic':
+        case 'cerner':
+        case 'fhir':
+          url = `${provider.endpoints.baseUrl}${provider.endpoints.patientUrl}`;
+          headers = {
+            'Authorization': `Bearer ${provider.credentials?.accessToken}`,
+            'Accept': 'application/fhir+json',
+          };
+          break;
+        case 'athena':
+          url = `${provider.endpoints.baseUrl}${provider.endpoints.patientUrl}`;
+          headers = {
+            'Authorization': `Bearer ${provider.credentials?.accessToken}`,
+            'Accept': 'application/json',
+          };
+          break;
+        default:
+          throw new Error(`Unsupported provider type for patient fetch: ${provider.type}`);
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        throw new Error(`EHR API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Parse response based on provider type
+      if (provider.type === 'epic' || provider.type === 'cerner' || provider.type === 'fhir') {
+        // FHIR format
+        if (data.entry) {
+          for (const entry of data.entry) {
+            const patient = this.parseFHIRPatient(entry.resource);
+            if (patient) patients.push(patient);
+          }
+        }
+      } else if (provider.type === 'athena') {
+        // athenahealth format
+        if (data.patients) {
+          for (const patientData of data.patients) {
+            const patient = this.parseAthenaPatient(patientData);
+            if (patient) patients.push(patient);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to fetch patients from EHR', 'ehr-pms', { error, providerId: provider.id });
+      throw error;
+    }
+
+    return patients;
+  }
+
+  /**
+   * Fetch appointments from EHR system
+   */
+  private async fetchEHRAppointments(provider: EHRProvider): Promise<AppointmentRecord[]> {
+    const appointments: AppointmentRecord[] = [];
+
+    try {
+      let url = '';
+      let headers: Record<string, string> = {};
+
+      switch (provider.type) {
+        case 'epic':
+        case 'cerner':
+        case 'fhir':
+          url = `${provider.endpoints.baseUrl}${provider.endpoints.appointmentUrl}`;
+          headers = {
+            'Authorization': `Bearer ${provider.credentials?.accessToken}`,
+            'Accept': 'application/fhir+json',
+          };
+          break;
+        case 'athena':
+          url = `${provider.endpoints.baseUrl}${provider.endpoints.appointmentUrl}`;
+          headers = {
+            'Authorization': `Bearer ${provider.credentials?.accessToken}`,
+            'Accept': 'application/json',
+          };
+          break;
+        default:
+          throw new Error(`Unsupported provider type for appointment fetch: ${provider.type}`);
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        throw new Error(`EHR API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Parse response based on provider type
+      if (provider.type === 'epic' || provider.type === 'cerner' || provider.type === 'fhir') {
+        // FHIR format
+        if (data.entry) {
+          for (const entry of data.entry) {
+            const appointment = this.parseFHIRAppointment(entry.resource);
+            if (appointment) appointments.push(appointment);
+          }
+        }
+      } else if (provider.type === 'athena') {
+        // athenahealth format
+        if (data.appointments) {
+          for (const appointmentData of data.appointments) {
+            const appointment = this.parseAthenaAppointment(appointmentData);
+            if (appointment) appointments.push(appointment);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to fetch appointments from EHR', 'ehr-pms', { error, providerId: provider.id });
+      throw error;
+    }
+
+    return appointments;
+  }
+
+  /**
+   * Parse FHIR Patient resource
+   */
+  private parseFHIRPatient(fhirPatient: any): PatientRecord | null {
+    try {
+      const name = fhirPatient.name?.[0];
+      const telecom = fhirPatient.telecom || [];
+      const address = fhirPatient.address?.[0];
+
+      return {
+        id: fhirPatient.id,
+        externalId: fhirPatient.id,
+        firstName: name?.given?.[0] || '',
+        lastName: name?.family || '',
+        dateOfBirth: new Date(fhirPatient.birthDate),
+        gender: fhirPatient.gender || 'unknown',
+        email: telecom.find((t: any) => t.system === 'email')?.value,
+        phone: telecom.find((t: any) => t.system === 'phone')?.value,
+        address: address ? {
+          street: address.line?.join(' ') || '',
+          city: address.city || '',
+          state: address.state || '',
+          zipCode: address.postalCode || '',
+          country: address.country || '',
+        } : undefined,
+        lastUpdated: new Date(),
+        source: 'ehr',
+      };
+    } catch (error) {
+      logger.error('Failed to parse FHIR patient', 'ehr-pms', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Parse athenahealth Patient
+   */
+  private parseAthenaPatient(athenaPatient: any): PatientRecord | null {
+    try {
+      return {
+        id: athenaPatient.patientid,
+        externalId: athenaPatient.patientid,
+        firstName: athenaPatient.firstname || '',
+        lastName: athenaPatient.lastname || '',
+        dateOfBirth: new Date(athenaPatient.dob),
+        gender: athenaPatient.sex?.toLowerCase() || 'unknown',
+        email: athenaPatient.email,
+        phone: athenaPatient.homephone || athenaPatient.mobilephone,
+        address: {
+          street: `${athenaPatient.address1 || ''} ${athenaPatient.address2 || ''}`.trim(),
+          city: athenaPatient.city || '',
+          state: athenaPatient.state || '',
+          zipCode: athenaPatient.zip || '',
+          country: 'US',
+        },
+        lastUpdated: new Date(),
+        source: 'ehr',
+      };
+    } catch (error) {
+      logger.error('Failed to parse athenahealth patient', 'ehr-pms', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Parse FHIR Appointment resource
+   */
+  private parseFHIRAppointment(fhirAppointment: any): AppointmentRecord | null {
+    try {
+      return {
+        id: fhirAppointment.id,
+        externalId: fhirAppointment.id,
+        patientId: fhirAppointment.participant?.find((p: any) => p.actor?.reference?.startsWith('Patient/'))?.actor?.reference?.split('/')[1] || '',
+        providerId: fhirAppointment.participant?.find((p: any) => p.actor?.reference?.startsWith('Practitioner/'))?.actor?.reference?.split('/')[1] || '',
+        appointmentType: fhirAppointment.appointmentType?.text || fhirAppointment.serviceType?.[0]?.text || 'Appointment',
+        startTime: new Date(fhirAppointment.start),
+        endTime: new Date(fhirAppointment.end),
+        status: this.mapFHIRAppointmentStatus(fhirAppointment.status),
+        reasonForVisit: fhirAppointment.reasonCode?.[0]?.text || fhirAppointment.description,
+        notes: fhirAppointment.comment,
+        lastUpdated: new Date(),
+        source: 'ehr',
+      };
+    } catch (error) {
+      logger.error('Failed to parse FHIR appointment', 'ehr-pms', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Parse athenahealth Appointment
+   */
+  private parseAthenaAppointment(athenaAppointment: any): AppointmentRecord | null {
+    try {
+      return {
+        id: athenaAppointment.appointmentid,
+        externalId: athenaAppointment.appointmentid,
+        patientId: athenaAppointment.patientid,
+        providerId: athenaAppointment.providerid,
+        appointmentType: athenaAppointment.appointmenttype || 'Appointment',
+        startTime: new Date(`${athenaAppointment.date} ${athenaAppointment.starttime}`),
+        endTime: new Date(`${athenaAppointment.date} ${athenaAppointment.endtime || athenaAppointment.starttime}`),
+        status: this.mapAthenaAppointmentStatus(athenaAppointment.appointmentstatus),
+        reasonForVisit: athenaAppointment.reasonforvisit,
+        notes: athenaAppointment.notes,
+        lastUpdated: new Date(),
+        source: 'ehr',
+      };
+    } catch (error) {
+      logger.error('Failed to parse athenahealth appointment', 'ehr-pms', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Map FHIR appointment status to clinic status
+   */
+  private mapFHIRAppointmentStatus(fhirStatus: string): AppointmentRecord['status'] {
+    switch (fhirStatus?.toLowerCase()) {
+      case 'proposed': return 'scheduled';
+      case 'pending': return 'scheduled';
+      case 'booked': return 'confirmed';
+      case 'arrived': return 'arrived';
+      case 'fulfilled': return 'completed';
+      case 'cancelled': return 'cancelled';
+      case 'noshow': return 'no-show';
+      default: return 'scheduled';
+    }
+  }
+
+  /**
+   * Map athenahealth appointment status to clinic status
+   */
+  private mapAthenaAppointmentStatus(athenaStatus: string): AppointmentRecord['status'] {
+    switch (athenaStatus?.toLowerCase()) {
+      case 'scheduled': return 'scheduled';
+      case 'confirmed': return 'confirmed';
+      case 'arrived': return 'arrived';
+      case 'inprogress': return 'in-progress';
+      case 'complete': return 'completed';
+      case 'cancelled': return 'cancelled';
+      case 'noshow': return 'no-show';
+      default: return 'scheduled';
+    }
+  }
+
+  /**
+   * Map EHR appointment status to clinic status
+   */
+  private mapEHRAppointmentStatus(ehrStatus: string): string {
+    switch (ehrStatus?.toLowerCase()) {
+      case 'scheduled': return 'scheduled';
+      case 'confirmed': return 'confirmed';
+      case 'arrived': return 'confirmed';
+      case 'in-progress': return 'in_progress';
+      case 'completed': return 'completed';
+      case 'cancelled': return 'cancelled';
+      case 'no-show': return 'no_show';
+      default: return 'scheduled';
+    }
   }
 
   /**
