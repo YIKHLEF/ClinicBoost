@@ -1,4 +1,7 @@
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { logger } from './logging-monitoring';
+import { handleError } from './error-handling';
+import { secureConfig } from './config/secure-config';
 
 let stripePromise: Promise<Stripe | null>;
 
@@ -149,36 +152,132 @@ export const retrievePaymentIntent = async (
   }
 };
 
+export interface RefundRequest {
+  paymentIntentId: string;
+  amount?: number; // Amount in cents, if partial refund
+  reason?: 'duplicate' | 'fraudulent' | 'requested_by_customer';
+  metadata?: Record<string, string>;
+}
+
+export interface RefundResult {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  reason?: string;
+  created: number;
+  paymentIntentId: string;
+}
+
 export const processRefund = async (
-  paymentIntentId: string,
-  amount?: number,
-  reason?: string
-): Promise<{ success: boolean; refundId?: string; error?: string }> => {
+  request: RefundRequest
+): Promise<{ success: boolean; refund?: RefundResult; error?: string }> => {
   try {
-    const response = await fetch('/api/payments/refund', {
-      method: 'POST',
+    logger.info('Processing refund', 'stripe', {
+      paymentIntentId: request.paymentIntentId,
+      amount: request.amount,
+      reason: request.reason,
+    });
+
+    if (secureConfig.isDevelopment()) {
+      // Mock refund processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const mockRefund: RefundResult = {
+        id: `re_${Date.now()}`,
+        amount: request.amount || 5000, // Default mock amount
+        currency: 'mad',
+        status: 'succeeded',
+        reason: request.reason,
+        created: Math.floor(Date.now() / 1000),
+        paymentIntentId: request.paymentIntentId,
+      };
+
+      logger.info('Refund processed successfully (mock)', 'stripe', {
+        refundId: mockRefund.id,
+        amount: mockRefund.amount,
+      });
+
+      return { success: true, refund: mockRefund };
+    } else {
+      // Production: Call backend API
+      const response = await fetch('/api/stripe/refunds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Refund API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      logger.info('Refund processed successfully', 'stripe', {
+        refundId: result.id,
+        amount: result.amount,
+      });
+
+      return { success: true, refund: result };
+    }
+  } catch (error) {
+    logger.error('Refund processing failed', 'stripe', { error, request });
+    handleError(error as Error, 'stripe-refund');
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+export const getRefund = async (refundId: string): Promise<RefundResult | null> => {
+  try {
+    const response = await fetch(`/api/stripe/refunds/${refundId}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        paymentIntentId,
-        amount,
-        reason,
-      }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to process refund');
+      throw new Error(`Failed to retrieve refund: ${response.status}`);
     }
 
-    const result = await response.json();
-    return { success: true, refundId: result.id };
+    return await response.json();
   } catch (error) {
-    console.error('Error processing refund:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
+    console.error('Error retrieving refund:', error);
+    return null;
+  }
+};
+
+export const listRefunds = async (
+  paymentIntentId?: string,
+  limit: number = 10
+): Promise<{ refunds: RefundResult[]; hasMore: boolean } | null> => {
+  try {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      ...(paymentIntentId && { payment_intent: paymentIntentId }),
+    });
+
+    const response = await fetch(`/api/stripe/refunds?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list refunds: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error listing refunds:', error);
+    return null;
   }
 };
 

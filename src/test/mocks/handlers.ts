@@ -268,6 +268,123 @@ export const handlers = [
     });
   }),
 
+  // Enhanced API endpoints for third-party integrations
+  http.post('/api/twilio/sms', async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      messageId: 'SM' + Math.random().toString(36).substr(2, 32),
+      status: 'queued',
+      to: body.to,
+      from: body.from,
+    });
+  }),
+
+  http.post('/api/twilio/whatsapp', async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      messageId: 'WA' + Math.random().toString(36).substr(2, 32),
+      status: 'queued',
+      to: body.to,
+      from: body.from,
+    });
+  }),
+
+  http.post('/api/stripe/refunds', async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      id: 're_' + Math.random().toString(36).substr(2, 24),
+      amount: body.amount || 5000,
+      currency: 'mad',
+      status: 'succeeded',
+      payment_intent: body.paymentIntentId,
+      reason: body.reason,
+      created: Math.floor(Date.now() / 1000),
+    });
+  }),
+
+  http.get('/api/stripe/refunds/:refundId', ({ params }) => {
+    return HttpResponse.json({
+      id: params.refundId,
+      amount: 5000,
+      currency: 'mad',
+      status: 'succeeded',
+      created: Math.floor(Date.now() / 1000),
+    });
+  }),
+
+  http.get('/api/stripe/refunds', ({ request }) => {
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+
+    return HttpResponse.json({
+      refunds: Array(Math.min(limit, 5)).fill(0).map((_, i) => ({
+        id: 're_' + Math.random().toString(36).substr(2, 24),
+        amount: 5000,
+        currency: 'mad',
+        status: 'succeeded',
+        created: Math.floor(Date.now() / 1000) - i * 86400,
+      })),
+      hasMore: false,
+    });
+  }),
+
+  http.post('/api/stripe/subscriptions', async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      subscriptionId: 'sub_' + Math.random().toString(36).substr(2, 24),
+      status: body.trialDays ? 'trialing' : 'active',
+      customerId: 'cus_' + Math.random().toString(36).substr(2, 24),
+    });
+  }),
+
+  http.put('/api/stripe/subscriptions/:subscriptionId', async ({ params, request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      subscriptionId: params.subscriptionId,
+      status: 'active',
+      updated: true,
+    });
+  }),
+
+  http.post('/api/stripe/subscriptions/:subscriptionId/cancel', async ({ params, request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      subscriptionId: params.subscriptionId,
+      status: body.cancelAtPeriodEnd ? 'active' : 'cancelled',
+      cancelAtPeriodEnd: body.cancelAtPeriodEnd,
+    });
+  }),
+
+  http.post('/api/stripe/subscriptions/:subscriptionId/reactivate', ({ params }) => {
+    return HttpResponse.json({
+      subscriptionId: params.subscriptionId,
+      status: 'active',
+      cancelAtPeriodEnd: false,
+    });
+  }),
+
+  http.post('/api/stripe/webhooks', async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      received: true,
+      eventType: body.type,
+      processed: true,
+    });
+  }),
+
+  http.get('/api/health', () => {
+    return HttpResponse.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      services: {
+        twilio: 'operational',
+        stripe: 'operational',
+        azure_ai: 'operational',
+        database: 'operational',
+      },
+    });
+  }),
+
   // Azure AI endpoints
   http.post('https://test.cognitiveservices.azure.com/text/analytics/v3.1/sentiment', () => {
     return HttpResponse.json({
