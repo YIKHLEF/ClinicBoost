@@ -5,15 +5,21 @@ type Appointment = Database['public']['Tables']['appointments']['Row'];
 type AppointmentInsert = Database['public']['Tables']['appointments']['Insert'];
 type AppointmentUpdate = Database['public']['Tables']['appointments']['Update'];
 
-export const getAppointments = async () => {
-  const { data, error } = await supabase
+export const getAppointments = async (clinicId?: string) => {
+  let query = supabase
     .from('appointments')
     .select(`
       *,
       patients (id, first_name, last_name),
       users (id, first_name, last_name)
-    `)
-    .order('start_time', { ascending: true });
+    `);
+
+  // Filter by clinic if provided
+  if (clinicId) {
+    query = query.eq('clinic_id', clinicId);
+  }
+
+  const { data, error } = await query.order('start_time', { ascending: true });
 
   if (error) throw error;
   return data;

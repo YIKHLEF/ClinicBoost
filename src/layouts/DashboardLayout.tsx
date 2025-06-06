@@ -6,7 +6,8 @@ import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import GlobalSearch from '../components/GlobalSearch';
 import { Breadcrumbs } from '../components/ui/Breadcrumbs';
-import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone, Shield } from 'lucide-react';
+import { ClinicSwitcher } from '../components/clinic/ClinicSwitcher';
+import { LayoutDashboard, Users, Calendar, MessageSquare, Megaphone, Receipt, BarChart3, Settings, Bell, Menu, X, LogOut, Bluetooth as Tooth, ChevronDown, Search, Eye, Zap, UserCog, Smartphone, Shield, Building2, Share2 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useRBAC } from '../hooks/useRBAC';
 import { PermissionAction } from '../lib/user-management/user-service';
@@ -54,6 +55,8 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.billing'), path: '/billing', icon: Receipt },
     { name: t('navigation.reports'), path: '/reports', icon: BarChart3 },
     { name: t('navigation.reportsAnalytics'), path: '/reports-analytics', icon: BarChart3 },
+    { name: t('navigation.clinicManagement'), path: '/clinic-management', icon: Building2, requiresPermission: { resource: 'clinics', action: PermissionAction.READ } },
+    { name: t('navigation.resourceSharing'), path: '/resource-sharing', icon: Share2 },
     { name: t('navigation.backupRecovery'), path: '/backup-recovery', icon: Settings },
     { name: t('navigation.compliance'), path: '/compliance', icon: Shield, requiresPermission: { resource: 'compliance', action: PermissionAction.READ } },
     { name: t('navigation.userManagement'), path: '/users', icon: UserCog, requiresPermission: { resource: 'users', action: PermissionAction.READ } },
@@ -191,16 +194,21 @@ const DashboardLayout: React.FC = () => {
             <GlobalSearch />
           </div>
           
+          {/* Clinic Switcher */}
+          <div className="ml-4 hidden lg:block">
+            <ClinicSwitcher showCreateButton={true} />
+          </div>
+
           {/* Right section */}
           <div className="ml-auto flex items-center gap-2">
             {/* Notifications */}
             <button className="p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700">
               <Bell size={20} />
             </button>
-            
+
             {/* Theme toggle */}
             <ThemeToggle />
-            
+
             {/* Language switcher */}
             <LanguageSwitcher />
             

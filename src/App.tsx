@@ -23,10 +23,13 @@ const Compliance = lazy(() => import('./pages/Compliance'));
 const Login = lazy(() => import('./pages/Login'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const TestConnection = lazy(() => import('./pages/TestConnection'));
+const ClinicManagement = lazy(() => import('./pages/ClinicManagement'));
+const ResourceSharing = lazy(() => import('./pages/ResourceSharing'));
 
 // Context providers
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ClinicProvider } from './contexts/ClinicContext';
 import { ToastProvider } from './components/ui/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -138,6 +141,8 @@ const AppContent: React.FC = () => {
           <Route path="billing" element={<Billing />} />
           <Route path="reports" element={<Reports />} />
           <Route path="reports-analytics" element={<ReportsAnalytics />} />
+          <Route path="clinic-management" element={<ClinicManagement />} />
+          <Route path="resource-sharing" element={<ResourceSharing />} />
           <Route path="backup-recovery" element={<BackupRecovery />} />
           <Route path="compliance" element={<Compliance />} />
           <Route path="settings" element={<Settings />} />
@@ -194,7 +199,8 @@ function App() {
           <ToastProvider>
             <ResponsiveProvider>
               <AuthProvider>
-                <OnboardingProvider>
+                <ClinicProvider>
+                  <OnboardingProvider>
                 <Suspense fallback={
                   <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
                     <div className="text-center">
@@ -205,7 +211,8 @@ function App() {
                 }>
                   <AppContent />
                 </Suspense>
-                </OnboardingProvider>
+                  </OnboardingProvider>
+                </ClinicProvider>
               </AuthProvider>
             </ResponsiveProvider>
           </ToastProvider>

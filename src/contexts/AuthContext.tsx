@@ -8,6 +8,7 @@ type UserProfile = Database['public']['Tables']['users']['Row'];
 
 interface User extends SupabaseUser {
   profile?: UserProfile;
+  default_clinic_id?: string;
 }
 
 interface DemoUserExtended extends DemoUser {

@@ -259,6 +259,127 @@ export interface Database {
           updated_at?: string
         }
       }
+      clinics: {
+        Row: {
+          id: string
+          name: string
+          type: 'general' | 'orthodontics' | 'oral_surgery' | 'pediatric' | 'cosmetic' | 'periodontics' | 'endodontics'
+          description: string | null
+          address: string
+          city: string
+          postal_code: string | null
+          country: string
+          phone: string
+          email: string
+          website: string | null
+          logo_url: string | null
+          license_number: string | null
+          tax_id: string | null
+          settings: Json
+          working_hours: Json
+          timezone: string
+          is_active: boolean
+          owner_id: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          type?: 'general' | 'orthodontics' | 'oral_surgery' | 'pediatric' | 'cosmetic' | 'periodontics' | 'endodontics'
+          description?: string | null
+          address: string
+          city: string
+          postal_code?: string | null
+          country?: string
+          phone: string
+          email: string
+          website?: string | null
+          logo_url?: string | null
+          license_number?: string | null
+          tax_id?: string | null
+          settings?: Json
+          working_hours?: Json
+          timezone?: string
+          is_active?: boolean
+          owner_id?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: 'general' | 'orthodontics' | 'oral_surgery' | 'pediatric' | 'cosmetic' | 'periodontics' | 'endodontics'
+          description?: string | null
+          address?: string
+          city?: string
+          postal_code?: string | null
+          country?: string
+          phone?: string
+          email?: string
+          website?: string | null
+          logo_url?: string | null
+          license_number?: string | null
+          tax_id?: string | null
+          settings?: Json
+          working_hours?: Json
+          timezone?: string
+          is_active?: boolean
+          owner_id?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
+      clinic_memberships: {
+        Row: {
+          id: string
+          user_id: string | null
+          clinic_id: string | null
+          role: 'admin' | 'dentist' | 'staff' | 'billing'
+          permissions: Json
+          is_active: boolean
+          joined_at: string
+          left_at: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          clinic_id?: string | null
+          role?: 'admin' | 'dentist' | 'staff' | 'billing'
+          permissions?: Json
+          is_active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          clinic_id?: string | null
+          role?: 'admin' | 'dentist' | 'staff' | 'billing'
+          permissions?: Json
+          is_active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
       users: {
         Row: {
           id: string
@@ -267,6 +388,7 @@ export interface Database {
           last_name: string
           phone: string | null
           avatar_url: string | null
+          default_clinic_id: string | null
           created_at: string
           updated_at: string
         }
@@ -277,6 +399,7 @@ export interface Database {
           last_name: string
           phone?: string | null
           avatar_url?: string | null
+          default_clinic_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -287,13 +410,136 @@ export interface Database {
           last_name?: string
           phone?: string | null
           avatar_url?: string | null
+          default_clinic_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      clinic_resources: {
+        Row: {
+          id: string
+          clinic_id: string | null
+          name: string
+          type: 'equipment' | 'room' | 'staff' | 'material' | 'service'
+          description: string | null
+          specifications: Json
+          location: string | null
+          capacity: number | null
+          cost_per_hour: number | null
+          cost_per_use: number | null
+          availability_schedule: Json
+          maintenance_schedule: Json
+          is_available: boolean
+          is_shareable: boolean
+          sharing_terms: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          clinic_id?: string | null
+          name: string
+          type: 'equipment' | 'room' | 'staff' | 'material' | 'service'
+          description?: string | null
+          specifications?: Json
+          location?: string | null
+          capacity?: number | null
+          cost_per_hour?: number | null
+          cost_per_use?: number | null
+          availability_schedule?: Json
+          maintenance_schedule?: Json
+          is_available?: boolean
+          is_shareable?: boolean
+          sharing_terms?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          clinic_id?: string | null
+          name?: string
+          type?: 'equipment' | 'room' | 'staff' | 'material' | 'service'
+          description?: string | null
+          specifications?: Json
+          location?: string | null
+          capacity?: number | null
+          cost_per_hour?: number | null
+          cost_per_use?: number | null
+          availability_schedule?: Json
+          maintenance_schedule?: Json
+          is_available?: boolean
+          is_shareable?: boolean
+          sharing_terms?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
+      resource_sharing: {
+        Row: {
+          id: string
+          resource_id: string | null
+          requesting_clinic_id: string | null
+          providing_clinic_id: string | null
+          requested_by: string | null
+          approved_by: string | null
+          start_time: string
+          end_time: string
+          status: 'available' | 'requested' | 'approved' | 'in_use' | 'returned' | 'declined'
+          cost: number | null
+          terms: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+          approved_at: string | null
+          returned_at: string | null
+        }
+        Insert: {
+          id?: string
+          resource_id?: string | null
+          requesting_clinic_id?: string | null
+          providing_clinic_id?: string | null
+          requested_by?: string | null
+          approved_by?: string | null
+          start_time: string
+          end_time: string
+          status?: 'available' | 'requested' | 'approved' | 'in_use' | 'returned' | 'declined'
+          cost?: number | null
+          terms?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          approved_at?: string | null
+          returned_at?: string | null
+        }
+        Update: {
+          id?: string
+          resource_id?: string | null
+          requesting_clinic_id?: string | null
+          providing_clinic_id?: string | null
+          requested_by?: string | null
+          approved_by?: string | null
+          start_time?: string
+          end_time?: string
+          status?: 'available' | 'requested' | 'approved' | 'in_use' | 'returned' | 'declined'
+          cost?: number | null
+          terms?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          approved_at?: string | null
+          returned_at?: string | null
         }
       }
       patients: {
         Row: {
           id: string
+          clinic_id: string | null
           first_name: string
           last_name: string
           email: string | null
@@ -315,6 +561,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          clinic_id?: string | null
           first_name: string
           last_name: string
           email?: string | null
@@ -336,6 +583,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          clinic_id?: string | null
           first_name?: string
           last_name?: string
           email?: string | null
@@ -359,6 +607,7 @@ export interface Database {
       appointments: {
         Row: {
           id: string
+          clinic_id: string | null
           patient_id: string
           dentist_id: string | null
           start_time: string
@@ -374,6 +623,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          clinic_id?: string | null
           patient_id: string
           dentist_id?: string | null
           start_time: string
@@ -389,6 +639,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          clinic_id?: string | null
           patient_id?: string
           dentist_id?: string | null
           start_time?: string
@@ -591,6 +842,9 @@ export interface Database {
       appointment_status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
       payment_status: 'pending' | 'partial' | 'completed' | 'refunded'
       campaign_status: 'draft' | 'scheduled' | 'active' | 'completed' | 'paused'
+      clinic_type: 'general' | 'orthodontics' | 'oral_surgery' | 'pediatric' | 'cosmetic' | 'periodontics' | 'endodontics'
+      resource_type: 'equipment' | 'room' | 'staff' | 'material' | 'service'
+      sharing_status: 'available' | 'requested' | 'approved' | 'in_use' | 'returned' | 'declined'
     }
   }
 }

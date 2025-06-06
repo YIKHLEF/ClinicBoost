@@ -5,12 +5,18 @@ type Patient = Database['public']['Tables']['patients']['Row'];
 type PatientInsert = Database['public']['Tables']['patients']['Insert'];
 type PatientUpdate = Database['public']['Tables']['patients']['Update'];
 
-export const getPatients = async (): Promise<Patient[]> => {
+export const getPatients = async (clinicId?: string): Promise<Patient[]> => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('patients')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    // Filter by clinic if provided
+    if (clinicId) {
+      query = query.eq('clinic_id', clinicId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching patients:', error);

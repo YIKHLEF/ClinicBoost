@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { getPatients, getPatient, createPatient, updatePatient, deletePatient } from '../lib/api/patients';
 import { subscribeToTable } from '../lib/supabase';
 import { useToast } from '../components/ui/Toast';
+import { useCurrentClinicId } from '../contexts/ClinicContext';
 import type { Database } from '../lib/database.types';
 
 type Patient = Database['public']['Tables']['patients']['Row'];
@@ -12,12 +13,14 @@ type PatientUpdate = Database['public']['Tables']['patients']['Update'];
 export const usePatients = (options?: { realtime?: boolean }) => {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
+  const clinicId = useCurrentClinicId();
 
   const query = useQuery({
-    queryKey: ['patients'],
-    queryFn: getPatients,
+    queryKey: ['patients', clinicId],
+    queryFn: () => getPatients(clinicId || undefined),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!clinicId, // Only fetch when clinic is selected
   });
 
   // Real-time subscription
@@ -30,7 +33,7 @@ export const usePatients = (options?: { realtime?: boolean }) => {
         console.log('Patient change detected:', payload);
 
         // Invalidate and refetch patients data
-        queryClient.invalidateQueries({ queryKey: ['patients'] });
+        queryClient.invalidateQueries({ queryKey: ['patients', clinicId] });
 
         // Show notification for changes
         if (payload.eventType === 'INSERT') {
@@ -66,22 +69,27 @@ export const usePatient = (id: string) => {
 
 export const useCreatePatient = () => {
   const queryClient = useQueryClient();
-  
+  const clinicId = useCurrentClinicId();
+
   return useMutation({
-    mutationFn: createPatient,
+    mutationFn: (patient: PatientInsert) => createPatient({
+      ...patient,
+      clinic_id: clinicId
+    }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patients', clinicId] });
     },
   });
 };
 
 export const useUpdatePatient = () => {
   const queryClient = useQueryClient();
-  
+  const clinicId = useCurrentClinicId();
+
   return useMutation({
     mutationFn: updatePatient,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patients', clinicId] });
       queryClient.invalidateQueries({ queryKey: ['patients', data.id] });
     },
   });
@@ -89,11 +97,12 @@ export const useUpdatePatient = () => {
 
 export const useDeletePatient = () => {
   const queryClient = useQueryClient();
-  
+  const clinicId = useCurrentClinicId();
+
   return useMutation({
     mutationFn: deletePatient,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patients', clinicId] });
     },
   });
 };
