@@ -412,6 +412,283 @@ export class GDPRService {
   }
 
   /**
+   * Get data subject requests for a specific user/patient
+   */
+  async getDataSubjectRequests(userId?: string, patientId?: string): Promise<DataSubjectRequest[]> {
+    try {
+      let query = supabase
+        .from('data_subject_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      } else if (patientId) {
+        query = query.eq('patient_id', patientId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      logger.info('Data subject requests retrieved', 'gdpr-service', {
+        userId,
+        patientId,
+        count: data?.length || 0
+      });
+
+      return data || [];
+    } catch (error) {
+      logger.error('Failed to get data subject requests', 'gdpr-service', { error, userId, patientId });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all data subject requests (admin function)
+   */
+  async getAllDataSubjectRequests(
+    status?: 'pending' | 'in_progress' | 'completed' | 'rejected',
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ requests: DataSubjectRequest[]; total: number }> {
+    try {
+      let query = supabase
+        .from('data_subject_requests')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      logger.info('All data subject requests retrieved', 'gdpr-service', {
+        status,
+        count: count || 0,
+        limit,
+        offset
+      });
+
+      return {
+        requests: data || [],
+        total: count || 0
+      };
+    } catch (error) {
+      logger.error('Failed to get all data subject requests', 'gdpr-service', { error, status });
+      throw error;
+    }
+  }
+
+  /**
+   * Update data subject request status
+   */
+  async updateDataSubjectRequestStatus(
+    requestId: string,
+    status: 'pending' | 'in_progress' | 'completed' | 'rejected',
+    processedBy?: string,
+    notes?: string,
+    responseData?: any
+  ): Promise<boolean> {
+    try {
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString()
+      };
+
+      if (processedBy) {
+        updateData.processed_by = processedBy;
+        updateData.processed_at = new Date().toISOString();
+      }
+
+      if (notes) {
+        updateData.notes = notes;
+      }
+
+      if (responseData) {
+        updateData.response_data = responseData;
+      }
+
+      const { error } = await supabase
+        .from('data_subject_requests')
+        .update(updateData)
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      logger.info('Data subject request status updated', 'gdpr-service', {
+        requestId,
+        status,
+        processedBy
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to update data subject request status', 'gdpr-service', {
+        error,
+        requestId,
+        status
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Process data subject request based on type
+   */
+  async processDataSubjectRequest(requestId: string, processedBy: string): Promise<boolean> {
+    try {
+      // Get the request details
+      const { data: request, error: fetchError } = await supabase
+        .from('data_subject_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!request) throw new Error('Request not found');
+
+      let responseData: any = {};
+      let success = false;
+
+      switch (request.request_type) {
+        case 'access':
+          // Export user/patient data
+          responseData = await this.exportData(request.user_id, request.patient_id, {
+            format: 'json',
+            includeMetadata: true,
+            anonymize: false
+          });
+          success = true;
+          break;
+
+        case 'portability':
+          // Export data in portable format
+          responseData = await this.exportData(request.user_id, request.patient_id, {
+            format: 'json',
+            includeMetadata: true,
+            anonymize: false
+          });
+          success = true;
+          break;
+
+        case 'erasure':
+          // Delete user/patient data
+          success = await this.deleteData(request.user_id, request.patient_id);
+          responseData = { deleted: success };
+          break;
+
+        case 'rectification':
+          // This requires manual intervention - mark as in progress
+          await this.updateDataSubjectRequestStatus(
+            requestId,
+            'in_progress',
+            processedBy,
+            'Rectification request requires manual review and data correction'
+          );
+          return true;
+
+        case 'restriction':
+          // This requires manual intervention - mark as in progress
+          await this.updateDataSubjectRequestStatus(
+            requestId,
+            'in_progress',
+            processedBy,
+            'Restriction request requires manual review and processing restriction setup'
+          );
+          return true;
+
+        default:
+          throw new Error(`Unknown request type: ${request.request_type}`);
+      }
+
+      // Update request status to completed
+      await this.updateDataSubjectRequestStatus(
+        requestId,
+        'completed',
+        processedBy,
+        `Request processed successfully`,
+        responseData
+      );
+
+      logger.info('Data subject request processed', 'gdpr-service', {
+        requestId,
+        requestType: request.request_type,
+        processedBy,
+        success
+      });
+
+      return success;
+    } catch (error) {
+      // Update request status to rejected on error
+      await this.updateDataSubjectRequestStatus(
+        requestId,
+        'rejected',
+        processedBy,
+        `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+
+      logger.error('Failed to process data subject request', 'gdpr-service', {
+        error,
+        requestId,
+        processedBy
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get data subject request statistics
+   */
+  async getDataSubjectRequestStatistics(): Promise<{
+    total: number;
+    pending: number;
+    completed: number;
+    overdue: number;
+    byType: Record<string, number>;
+  }> {
+    try {
+      // Get all requests
+      const { data: allRequests, error } = await supabase
+        .from('data_subject_requests')
+        .select('status, request_type, due_date, created_at');
+
+      if (error) throw error;
+
+      const now = new Date();
+      const stats = {
+        total: allRequests?.length || 0,
+        pending: 0,
+        completed: 0,
+        overdue: 0,
+        byType: {} as Record<string, number>
+      };
+
+      allRequests?.forEach(request => {
+        // Count by status
+        if (request.status === 'pending') stats.pending++;
+        if (request.status === 'completed') stats.completed++;
+
+        // Count overdue (pending/in_progress past due date)
+        if ((request.status === 'pending' || request.status === 'in_progress') &&
+            request.due_date && new Date(request.due_date) < now) {
+          stats.overdue++;
+        }
+
+        // Count by type
+        stats.byType[request.request_type] = (stats.byType[request.request_type] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      logger.error('Failed to get data subject request statistics', 'gdpr-service', { error });
+      throw error;
+    }
+  }
+
+  /**
    * Private helper methods
    */
   private async sendVerificationEmail(email: string, token: string): Promise<void> {

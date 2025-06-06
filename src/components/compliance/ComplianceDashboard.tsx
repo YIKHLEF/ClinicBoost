@@ -332,9 +332,23 @@ export const ComplianceDashboard: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                {t('compliance.dataSubjectRequests', 'Data Subject Requests')}
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  {t('compliance.dataSubjectRequests', 'Data Subject Requests')}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Navigate to data subject request manager
+                    // This would typically use router navigation
+                    window.location.hash = '#/compliance/data-subject-requests';
+                  }}
+                  className="text-xs"
+                >
+                  {t('compliance.manageRequests', 'Manage')}
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -356,6 +370,17 @@ export const ComplianceDashboard: React.FC = () => {
                   <span className="font-semibold text-red-600">{complianceMetrics.dataSubjectRequests.overdue}</span>
                 </div>
               </div>
+
+              {complianceMetrics.dataSubjectRequests.overdue > 0 && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      {t('compliance.overdueAlert', 'Attention: You have overdue data subject requests')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -417,6 +442,18 @@ export const ComplianceDashboard: React.FC = () => {
               <div className="text-left">
                 <div className="font-medium">{t('compliance.privacyCenter', 'Privacy Center')}</div>
                 <div className="text-sm text-gray-600">{t('compliance.privacyCenterDesc', 'Manage privacy settings')}</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 h-auto p-4"
+              onClick={() => window.location.hash = '#/compliance/data-subject-requests'}
+            >
+              <Users className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-medium">{t('compliance.manageDataRequests', 'Manage Data Requests')}</div>
+                <div className="text-sm text-gray-600">{t('compliance.manageDataRequestsDesc', 'Process data subject requests')}</div>
               </div>
             </Button>
 

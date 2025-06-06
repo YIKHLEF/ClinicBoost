@@ -9,3 +9,4 @@ export { AuditLogViewer } from './AuditLogViewer';
 export { DataRetentionDashboard } from './DataRetentionDashboard';
 export { PrivacyCenter } from './PrivacyCenter';
 export { ConsentBanner } from './ConsentBanner';
+export { DataSubjectRequestManager } from './DataSubjectRequestManager';

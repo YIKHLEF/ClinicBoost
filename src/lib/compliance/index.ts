@@ -182,13 +182,11 @@ export class ComplianceService {
         event => new Date(event.created_at) > lastWeekDate
       ).length;
 
+      // Get data subject request metrics
+      const dataSubjectStats = await gdprService.getDataSubjectRequestStatistics();
+
       return {
-        dataSubjectRequests: {
-          total: 0, // TODO: Implement data subject request metrics
-          pending: 0,
-          completed: 0,
-          overdue: 0
-        },
+        dataSubjectRequests: dataSubjectStats,
         auditEvents: {
           total: auditStats.totalEvents,
           highRisk: highRiskEvents,

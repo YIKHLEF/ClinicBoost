@@ -61,9 +61,9 @@ export const PrivacyCenter: React.FC = () => {
       const history = await consentService.getConsentHistory(user.id);
       setConsentHistory(history);
 
-      // TODO: Load data subject requests
-      // const requests = await gdprService.getDataSubjectRequests(user.id);
-      // setDataRequests(requests);
+      // Load data subject requests
+      const requests = await gdprService.getDataSubjectRequests(user.id);
+      setDataRequests(requests);
     } catch (error) {
       console.error('Failed to load privacy data:', error);
       showToast('Failed to load privacy data', 'error');
@@ -163,11 +163,41 @@ export const PrivacyCenter: React.FC = () => {
       });
 
       showToast(`${requestType} request submitted successfully`, 'success');
+
+      // Reload data requests to show the new request
+      const requests = await gdprService.getDataSubjectRequests(user.id);
+      setDataRequests(requests);
     } catch (error) {
       console.error('Failed to submit data request:', error);
       showToast('Failed to submit data request', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getRequestStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'rejected':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'in_progress':
+        return <Clock className="h-4 w-4 text-blue-600" />;
+      default:
+        return <AlertTriangle className="h-4 w-4 text-orange-600" />;
+    }
+  };
+
+  const getRequestStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'text-green-600 bg-green-50 dark:bg-green-900/20';
+      case 'rejected':
+        return 'text-red-600 bg-red-50 dark:bg-red-900/20';
+      case 'in_progress':
+        return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
+      default:
+        return 'text-orange-600 bg-orange-50 dark:bg-orange-900/20';
     }
   };
 
@@ -450,6 +480,78 @@ export const PrivacyCenter: React.FC = () => {
                   </div>
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Data Request History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('privacy.requests.history', 'Request History')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dataRequests.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>{t('privacy.requests.noRequests', 'No data requests submitted yet')}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {dataRequests.map((request) => (
+                    <div key={request.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {getRequestStatusIcon(request.status)}
+                          <div>
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                              {t(`privacy.requests.${request.request_type}`, request.request_type)} Request
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              Submitted: {new Date(request.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRequestStatusColor(request.status)}`}>
+                          {request.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+
+                      {request.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                          {request.description}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Request ID:</span> {request.id.slice(0, 8)}...
+                        </div>
+                        {request.due_date && (
+                          <div>
+                            <span className="font-medium">Due Date:</span> {new Date(request.due_date).toLocaleDateString()}
+                          </div>
+                        )}
+                        {request.processed_at && (
+                          <div>
+                            <span className="font-medium">Processed:</span> {new Date(request.processed_at).toLocaleDateString()}
+                          </div>
+                        )}
+                        {request.verified_at && (
+                          <div>
+                            <span className="font-medium">Verified:</span> {new Date(request.verified_at).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+
+                      {request.notes && (
+                        <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+                          <span className="font-medium text-sm">Notes:</span>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{request.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

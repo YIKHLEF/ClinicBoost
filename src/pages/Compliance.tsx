@@ -4,6 +4,7 @@ import { ComplianceDashboard } from '../components/compliance/ComplianceDashboar
 import { AuditLogViewer } from '../components/compliance/AuditLogViewer';
 import { DataRetentionDashboard } from '../components/compliance/DataRetentionDashboard';
 import { PrivacyCenter } from '../components/compliance/PrivacyCenter';
+import { DataSubjectRequestManager } from '../components/compliance/DataSubjectRequestManager';
 import { useRBAC, ProtectedComponent } from '../hooks/useRBAC';
 import {
   Shield,
@@ -15,7 +16,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-type ComplianceTab = 'dashboard' | 'audit' | 'retention' | 'privacy' | 'reports';
+type ComplianceTab = 'dashboard' | 'audit' | 'retention' | 'privacy' | 'data-requests' | 'reports';
 
 export const Compliance: React.FC = () => {
   const { t } = useTranslation();
@@ -48,9 +49,15 @@ export const Compliance: React.FC = () => {
       permission: 'compliance.privacy.view'
     },
     {
+      id: 'data-requests' as ComplianceTab,
+      label: t('compliance.tabs.dataRequests', 'Data Requests'),
+      icon: FileText,
+      permission: 'compliance.gdpr.manage'
+    },
+    {
       id: 'reports' as ComplianceTab,
       label: t('compliance.tabs.reports', 'Reports'),
-      icon: FileText,
+      icon: Settings,
       permission: 'compliance.reports.view'
     }
   ];
@@ -97,6 +104,12 @@ export const Compliance: React.FC = () => {
         return (
           <ProtectedComponent permission="compliance.privacy.view">
             <PrivacyCenter />
+          </ProtectedComponent>
+        );
+      case 'data-requests':
+        return (
+          <ProtectedComponent permission="compliance.gdpr.manage">
+            <DataSubjectRequestManager />
           </ProtectedComponent>
         );
       case 'reports':
