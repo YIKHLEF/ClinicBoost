@@ -5,6 +5,24 @@ type Patient = Database['public']['Tables']['patients']['Row'];
 type PatientInsert = Database['public']['Tables']['patients']['Insert'];
 type PatientUpdate = Database['public']['Tables']['patients']['Update'];
 
+export interface PatientSearchFilters {
+  search?: string;
+  status?: string;
+  riskLevel?: string;
+  insuranceProvider?: string;
+  city?: string;
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+  clinicId?: string;
+}
+
+export interface PatientSearchResult {
+  patients: Patient[];
+  totalCount: number;
+}
+
 export const getPatients = async (clinicId?: string): Promise<Patient[]> => {
   try {
     let query = supabase
@@ -26,6 +44,80 @@ export const getPatients = async (clinicId?: string): Promise<Patient[]> => {
     return data || [];
   } catch (error) {
     console.error('Unexpected error fetching patients:', error);
+    throw error;
+  }
+};
+
+export const searchPatients = async (
+  filters: PatientSearchFilters = {},
+  page: number = 1,
+  limit: number = 25,
+  sortBy: string = 'created_at',
+  sortOrder: 'asc' | 'desc' = 'desc'
+): Promise<PatientSearchResult> => {
+  try {
+    let query = supabase
+      .from('patients')
+      .select('*', { count: 'exact' });
+
+    // Apply clinic filter
+    if (filters.clinicId) {
+      query = query.eq('clinic_id', filters.clinicId);
+    }
+
+    // Apply search filter
+    if (filters.search) {
+      query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    // Apply risk level filter
+    if (filters.riskLevel) {
+      query = query.eq('risk_level', filters.riskLevel);
+    }
+
+    // Apply insurance provider filter
+    if (filters.insuranceProvider) {
+      query = query.ilike('insurance_provider', `%${filters.insuranceProvider}%`);
+    }
+
+    // Apply city filter
+    if (filters.city) {
+      query = query.ilike('city', `%${filters.city}%`);
+    }
+
+    // Apply date range filter
+    if (filters.dateRange) {
+      query = query
+        .gte('created_at', filters.dateRange.start)
+        .lte('created_at', filters.dateRange.end);
+    }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+    // Apply pagination
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('Error searching patients:', error);
+      throw new Error(`Failed to search patients: ${error.message}`);
+    }
+
+    return {
+      patients: data || [],
+      totalCount: count || 0,
+    };
+  } catch (error) {
+    console.error('Unexpected error searching patients:', error);
     throw error;
   }
 };

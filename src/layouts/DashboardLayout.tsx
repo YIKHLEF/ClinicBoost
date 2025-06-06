@@ -50,6 +50,7 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.dashboard'), path: '/', icon: LayoutDashboard },
     { name: t('navigation.patients'), path: '/patients', icon: Users },
     { name: t('navigation.appointments'), path: '/appointments', icon: Calendar },
+    { name: t('navigation.search'), path: '/search', icon: Search },
     { name: t('navigation.messaging'), path: '/messaging', icon: MessageSquare },
     { name: t('navigation.campaigns'), path: '/campaigns', icon: Megaphone },
     { name: t('navigation.billing'), path: '/billing', icon: Receipt },

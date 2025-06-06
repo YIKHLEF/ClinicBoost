@@ -227,7 +227,7 @@ export class GDPRService {
     options: DataExportOptions = { format: 'json', includeMetadata: true, anonymize: false }
   ): Promise<any> {
     try {
-      const exportData: any = {};
+      let exportData: any = {};
 
       if (userId) {
         // Export user data

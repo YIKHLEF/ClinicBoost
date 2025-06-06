@@ -25,6 +25,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const TestConnection = lazy(() => import('./pages/TestConnection'));
 const ClinicManagement = lazy(() => import('./pages/ClinicManagement'));
 const ResourceSharing = lazy(() => import('./pages/ResourceSharing'));
+const Search = lazy(() => import('./pages/Search'));
 
 // Context providers
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -136,6 +137,7 @@ const AppContent: React.FC = () => {
           <Route index element={<Dashboard />} />
           <Route path="patients" element={<Patients />} />
           <Route path="appointments" element={<Appointments />} />
+          <Route path="search" element={<Search />} />
           <Route path="messaging" element={<Messaging />} />
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="billing" element={<Billing />} />

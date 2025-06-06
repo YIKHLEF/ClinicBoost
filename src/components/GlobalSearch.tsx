@@ -1,119 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, User, Calendar, FileText, Clock, X } from 'lucide-react';
+import { Search, User, Calendar, FileText, Clock, X, CreditCard, Stethoscope } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../utils/cn';
-
-interface SearchResult {
-  id: string;
-  type: 'patient' | 'appointment' | 'invoice' | 'treatment';
-  title: string;
-  subtitle?: string;
-  description?: string;
-  url: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-}
+import { useQuickSearch } from '../hooks/useSearch';
+import { SearchEntityType } from '../lib/search/search-service';
 
 interface GlobalSearchProps {
   className?: string;
   placeholder?: string;
+  showAdvancedLink?: boolean;
+  maxResults?: number;
 }
 
-// Mock search data - in a real app, this would come from an API
-const mockSearchData: SearchResult[] = [
-  {
-    id: '1',
-    type: 'patient',
-    title: 'Mohammed Karimi',
-    subtitle: '+212 6 12 34 56 78',
-    description: 'Last visit: Dec 10, 2024',
-    url: '/patients/1',
-    icon: User,
-  },
-  {
-    id: '2',
-    type: 'patient',
-    title: 'Fatima Benali',
-    subtitle: '+212 6 87 65 43 21',
-    description: 'Last visit: Dec 8, 2024',
-    url: '/patients/2',
-    icon: User,
-  },
-  {
-    id: '3',
-    type: 'appointment',
-    title: 'Root Canal - Fatima Benali',
-    subtitle: 'Dec 15, 2024 at 2:30 PM',
-    description: 'Scheduled appointment',
-    url: '/appointments/3',
-    icon: Calendar,
-  },
-  {
-    id: '4',
-    type: 'appointment',
-    title: 'Checkup - Mohammed Karimi',
-    subtitle: 'Dec 15, 2024 at 9:00 AM',
-    description: 'Confirmed appointment',
-    url: '/appointments/4',
-    icon: Calendar,
-  },
-  {
-    id: '5',
-    type: 'invoice',
-    title: 'Invoice #INV-001',
-    subtitle: 'Mohammed Karimi',
-    description: '450.00 MAD - Paid',
-    url: '/billing/invoices/5',
-    icon: FileText,
-  },
-  {
-    id: '6',
-    type: 'treatment',
-    title: 'Dental Cleaning',
-    subtitle: 'Omar Saidi',
-    description: 'Completed on Dec 10, 2024',
-    url: '/patients/3/treatments/6',
-    icon: Clock,
-  },
-];
+const entityIcons: Record<SearchEntityType, React.ComponentType<{ size?: number; className?: string }>> = {
+  patient: User,
+  appointment: Calendar,
+  invoice: CreditCard,
+  treatment: Stethoscope,
+  user: User,
+};
 
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   className,
   placeholder,
+  showAdvancedLink = true,
+  maxResults = 8,
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Search function
-  const performSearch = (searchQuery: string) => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      return;
-    }
+  // Use the search hook
+  const { results: searchResults, isLoading } = useQuickSearch(query, {
+    limit: maxResults,
+    types: ['patient', 'appointment', 'invoice', 'treatment']
+  });
 
-    const filtered = mockSearchData.filter(item =>
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.subtitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    setResults(filtered.slice(0, 8)); // Limit to 8 results
-  };
-
-  // Handle input change
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      performSearch(query);
-    }, 300); // Debounce search
-
-    return () => clearTimeout(timeoutId);
-  }, [query]);
+  const results = searchResults?.results || [];
 
   // Handle click outside
   useEffect(() => {
@@ -157,7 +85,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
     }
   };
 
-  const handleResultClick = (result: SearchResult) => {
+  const handleResultClick = (result: any) => {
     navigate(result.url);
     setIsOpen(false);
     setQuery('');
@@ -167,13 +95,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
 
   const clearSearch = () => {
     setQuery('');
-    setResults([]);
     setIsOpen(false);
     setSelectedIndex(-1);
     inputRef.current?.focus();
   };
 
-  const getTypeColor = (type: SearchResult['type']) => {
+  const getTypeColor = (type: SearchEntityType) => {
     switch (type) {
       case 'patient':
         return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400';
@@ -183,6 +110,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
         return 'text-purple-600 bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400';
       case 'treatment':
         return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400';
+      case 'user':
+        return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20 dark:text-gray-400';
       default:
         return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20 dark:text-gray-400';
     }
@@ -222,15 +151,28 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
       {/* Search Results */}
       {isOpen && (query || results.length > 0) && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-          {results.length === 0 && query ? (
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500 mx-auto mb-2" />
+              <p className="text-sm">Searching...</p>
+            </div>
+          ) : results.length === 0 && query ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               <Search size={24} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm">No results found for "{query}"</p>
+              {showAdvancedLink && (
+                <button
+                  onClick={() => navigate(`/search?q=${encodeURIComponent(query)}`)}
+                  className="text-primary-600 dark:text-primary-400 text-sm mt-2 hover:underline"
+                >
+                  Try advanced search
+                </button>
+              )}
             </div>
           ) : (
             <div className="py-2">
               {results.map((result, index) => {
-                const Icon = result.icon;
+                const Icon = entityIcons[result.type];
                 return (
                   <button
                     key={result.id}

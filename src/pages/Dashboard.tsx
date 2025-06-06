@@ -1,11 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter 
+import {
+  Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter
 } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
-  Users, CalendarClock, ArrowUpRight, Banknote, 
+  Users, CalendarClock, ArrowUpRight, Banknote,
   BellRing, PhoneCall, AlertTriangle, BarChart3,
   ArrowRight, TrendingUp, Clock
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+import { cn } from '../utils/cn';
 
 // Mock data for revenue chart
 const revenueData = [
