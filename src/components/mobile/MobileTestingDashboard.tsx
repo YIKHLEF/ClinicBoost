@@ -20,6 +20,10 @@ import {
   Zap,
   Target,
   Gauge,
+  Bell,
+  Share2,
+  Maximize,
+  Touch,
 } from 'lucide-react';
 import {
   mobileTestingFramework,
@@ -28,22 +32,44 @@ import {
   type TestSuite,
 } from '../../lib/mobile/testing-framework';
 import { useResponsive } from '../../hooks/useResponsive';
+import { pwaFeatures, canInstallApp, showInstallPrompt, shareContent } from '../../lib/mobile/pwa-features';
+import { pushNotifications, requestNotificationPermission, showNotification, getNotificationPermissionState } from '../../lib/mobile/push-notifications';
+import TouchGestureHandler from './TouchGestureHandler';
+import { MobileCard, MobileBottomSheet, MobileActionButton } from './MobileOptimizedComponents';
 
 export const MobileTestingDashboard: React.FC = () => {
   const { addToast } = useToast();
   const responsive = useResponsive();
-  
+
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<Map<string, TestResult[]>>(new Map());
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [selectedSuite, setSelectedSuite] = useState<string>('');
   const [testDevices, setTestDevices] = useState<TestDevice[]>([]);
   const [testSuites, setTestSuites] = useState<TestSuite[]>([]);
+  const [showPWASheet, setShowPWASheet] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   useEffect(() => {
     setTestDevices(mobileTestingFramework.getTestDevices());
     setTestSuites(mobileTestingFramework.getTestSuites());
     setResults(mobileTestingFramework.getResults());
+
+    // Initialize PWA features
+    setCanInstall(canInstallApp());
+    setNotificationPermission(getNotificationPermissionState().permission);
+
+    // Listen for PWA events
+    const handleInstallStatusChange = (event: CustomEvent) => {
+      setCanInstall(!event.detail.isInstalled && canInstallApp());
+    };
+
+    window.addEventListener('pwa:installation-status-change', handleInstallStatusChange as EventListener);
+
+    return () => {
+      window.removeEventListener('pwa:installation-status-change', handleInstallStatusChange as EventListener);
+    };
   }, []);
 
   const runAllTests = async () => {
@@ -161,6 +187,62 @@ export const MobileTestingDashboard: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: 'Mobile Test Results',
+      text: `Mobile testing completed with ${overallStats.passed}/${overallStats.total} tests passed`,
+      url: window.location.href,
+    };
+
+    const shared = await shareContent(shareData);
+    if (shared) {
+      addToast({
+        type: 'success',
+        title: 'Shared Successfully',
+        message: 'Test results shared!',
+      });
+    }
+  };
+
+  const handleInstallApp = async () => {
+    const installed = await showInstallPrompt();
+    if (installed) {
+      setCanInstall(false);
+      addToast({
+        type: 'success',
+        title: 'App Installed',
+        message: 'ClinicBoost has been installed successfully!',
+      });
+    }
+  };
+
+  const handleRequestNotifications = async () => {
+    const permission = await requestNotificationPermission();
+    setNotificationPermission(permission);
+
+    if (permission === 'granted') {
+      showNotification({
+        title: 'Notifications Enabled',
+        body: 'You will now receive test completion notifications!',
+        icon: '/icons/notification-icon.png',
+      });
+
+      addToast({
+        type: 'success',
+        title: 'Notifications Enabled',
+        message: 'Push notifications are now active!',
+      });
+    }
+  };
+
+  const testTouchGestures = () => {
+    addToast({
+      type: 'info',
+      title: 'Touch Gesture Test',
+      message: 'Try swiping, pinching, or long-pressing on the test cards below!',
+    });
+  };
+
   const filteredResults = selectedDevice 
     ? new Map([[selectedDevice, results.get(selectedDevice) || []]])
     : results;
@@ -203,13 +285,25 @@ export const MobileTestingDashboard: React.FC = () => {
             )}
             {isRunning ? 'Running Tests...' : 'Run All Tests'}
           </Button>
-          
+
           {results.size > 0 && (
-            <Button variant="outline" onClick={exportResults}>
-              <Download size={16} className="mr-2" />
-              Export Results
-            </Button>
+            <>
+              <Button variant="outline" onClick={exportResults}>
+                <Download size={16} className="mr-2" />
+                Export Results
+              </Button>
+
+              <Button variant="outline" onClick={handleShare}>
+                <Share2 size={16} className="mr-2" />
+                Share
+              </Button>
+            </>
           )}
+
+          <Button variant="outline" onClick={() => setShowPWASheet(true)}>
+            <Smartphone size={16} className="mr-2" />
+            PWA Features
+          </Button>
         </div>
       </div>
 
@@ -467,6 +561,62 @@ export const MobileTestingDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Touch Gesture Testing */}
+      <Card className="p-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          Touch Gesture Testing
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TouchGestureHandler
+            config={{
+              enableSwipe: true,
+              enablePinch: true,
+              enableLongPress: true,
+              enableDoubleTap: true,
+            }}
+            callbacks={{
+              onSwipeLeft: () => addToast({ type: 'info', title: 'Gesture', message: 'Swiped Left!' }),
+              onSwipeRight: () => addToast({ type: 'info', title: 'Gesture', message: 'Swiped Right!' }),
+              onSwipeUp: () => addToast({ type: 'info', title: 'Gesture', message: 'Swiped Up!' }),
+              onSwipeDown: () => addToast({ type: 'info', title: 'Gesture', message: 'Swiped Down!' }),
+              onLongPress: () => addToast({ type: 'info', title: 'Gesture', message: 'Long Press!' }),
+              onDoubleTap: () => addToast({ type: 'info', title: 'Gesture', message: 'Double Tap!' }),
+              onPinchIn: () => addToast({ type: 'info', title: 'Gesture', message: 'Pinch In!' }),
+              onPinchOut: () => addToast({ type: 'info', title: 'Gesture', message: 'Pinch Out!' }),
+            }}
+          >
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800">
+              <Touch className="mx-auto text-gray-400 mb-4" size={48} />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Touch Gesture Test Area
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Try swiping, pinching, long-pressing, or double-tapping this area
+              </p>
+            </div>
+          </TouchGestureHandler>
+
+          <div className="space-y-4">
+            <Button onClick={testTouchGestures} className="w-full">
+              <Touch size={16} className="mr-2" />
+              Test Touch Gestures
+            </Button>
+
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <h4 className="font-medium mb-2">Supported Gestures:</h4>
+              <ul className="space-y-1">
+                <li>• Swipe (left, right, up, down)</li>
+                <li>• Pinch to zoom (in/out)</li>
+                <li>• Long press (500ms)</li>
+                <li>• Double tap (300ms)</li>
+                <li>• Pan and drag</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Empty State */}
       {results.size === 0 && !isRunning && (
         <Card className="p-12 text-center">
@@ -483,6 +633,92 @@ export const MobileTestingDashboard: React.FC = () => {
           </Button>
         </Card>
       )}
+
+      {/* PWA Features Bottom Sheet */}
+      <MobileBottomSheet
+        isOpen={showPWASheet}
+        onClose={() => setShowPWASheet(false)}
+        title="PWA Features Testing"
+        height="half"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Download className="w-6 h-6 text-blue-600" />
+              <div>
+                <div className="font-medium">App Installation</div>
+                <div className="text-sm text-gray-500">Install as PWA</div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleInstallApp}
+              disabled={!canInstall}
+            >
+              {canInstall ? 'Install' : 'Installed'}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Bell className="w-6 h-6 text-orange-600" />
+              <div>
+                <div className="font-medium">Push Notifications</div>
+                <div className="text-sm text-gray-500">Enable notifications</div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleRequestNotifications}
+              disabled={notificationPermission === 'granted'}
+            >
+              {notificationPermission === 'granted' ? 'Enabled' : 'Enable'}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Share2 className="w-6 h-6 text-green-600" />
+              <div>
+                <div className="font-medium">Web Share API</div>
+                <div className="text-sm text-gray-500">Test sharing</div>
+              </div>
+            </div>
+            <Button size="sm" onClick={handleShare}>
+              Test Share
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Maximize className="w-6 h-6 text-purple-600" />
+              <div>
+                <div className="font-medium">Fullscreen Mode</div>
+                <div className="text-sm text-gray-500">Toggle fullscreen</div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={async () => {
+                if (document.fullscreenElement) {
+                  await document.exitFullscreen();
+                } else {
+                  await document.documentElement.requestFullscreen();
+                }
+              }}
+            >
+              Toggle
+            </Button>
+          </div>
+        </div>
+      </MobileBottomSheet>
+
+      {/* Mobile Action Button for quick actions */}
+      <MobileActionButton
+        onClick={() => setShowPWASheet(true)}
+        icon={<Zap className="w-6 h-6" />}
+        position="bottom-right"
+      />
     </div>
   );
 };

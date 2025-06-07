@@ -51,6 +51,7 @@ import { UserManagement } from './components/users/UserManagement';
 
 // Mobile components
 import { MobileTestingDashboard } from './components/mobile/MobileTestingDashboard';
+import MobileDashboard from './components/mobile/MobileDashboard';
 import { ResponsiveProvider } from './hooks/useResponsive';
 
 // Performance components
@@ -87,6 +88,11 @@ import { analyticsCore } from './lib/integrations/analytics-core';
 import { advancedPerformanceMonitoring } from './lib/performance/advanced-monitoring';
 import { performanceIntegration } from './lib/performance/performance-integration';
 
+// Initialize mobile features
+import { pwaFeatures } from './lib/mobile/pwa-features';
+import { pushNotifications } from './lib/mobile/push-notifications';
+import { performanceOptimizer } from './lib/mobile/performance-optimizer';
+
 // Main app content with onboarding integration
 const AppContent: React.FC = () => {
   const { user } = useAuth();
@@ -106,6 +112,9 @@ const AppContent: React.FC = () => {
 
         // Initialize performance monitoring
         await performanceIntegration.initialize();
+
+        // Initialize mobile performance optimizer
+        await performanceOptimizer.initialize();
 
         console.log('Integration systems initialized successfully');
       } catch (error) {
@@ -169,6 +178,7 @@ const AppContent: React.FC = () => {
           <Route path="integrations" element={<IntegrationDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="mobile-testing" element={<MobileTestingDashboard />} />
+          <Route path="mobile-dashboard" element={<MobileDashboard />} />
           <Route path="performance" element={<AdvancedPerformanceDashboard />} />
           <Route path="config-test" element={<ConfigTest />} />
           <Route path="auth-test" element={<AuthTest />} />

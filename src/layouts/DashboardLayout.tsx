@@ -64,6 +64,7 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.userManagement'), path: '/users', icon: UserCog, requiresPermission: { resource: 'users', action: PermissionAction.READ } },
     { name: t('navigation.accessibility'), path: '/accessibility', icon: Eye },
     { name: t('navigation.mobileTesting'), path: '/mobile-testing', icon: Smartphone },
+    { name: 'Mobile Dashboard', path: '/mobile-dashboard', icon: Smartphone },
     { name: t('navigation.integrations'), path: '/integrations', icon: Zap },
     { name: t('navigation.performance'), path: '/performance', icon: Activity },
     { name: t('navigation.offlineSettings'), path: '/offline-settings', icon: WifiOff },
