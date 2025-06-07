@@ -550,7 +550,7 @@ class AdvancedPerformanceMonitoring {
     document.dispatchEvent(event);
 
     // Console warning for development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.warn(`Performance Alert: ${alert.metric} (${alert.value}${alert.context.unit || ''}) exceeded threshold (${alert.threshold})`, alert);
     }
   }
@@ -568,7 +568,7 @@ class AdvancedPerformanceMonitoring {
   private async sendMetricToServices(metric: PerformanceMetric): Promise<void> {
     // Send to DataDog, New Relic, etc.
     // This is a placeholder for actual service integration
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       try {
         // Example: DataDog integration
         // await fetch('/api/metrics', {
@@ -588,7 +588,7 @@ class AdvancedPerformanceMonitoring {
   private async sendBusinessMetricToServices(metric: BusinessMetric, context?: Record<string, any>): Promise<void> {
     // Send to Google Analytics, Mixpanel, etc.
     // This is a placeholder for actual service integration
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       try {
         // Example: Google Analytics integration
         // gtag('event', metric.name, {
@@ -684,9 +684,56 @@ class AdvancedPerformanceMonitoring {
             context: { id: metric.id, delta: metric.delta },
           });
         });
-      }).catch(() => {
-        console.warn('web-vitals library not available');
+      }).catch((error) => {
+        logger.warn('web-vitals library not available', 'advanced-monitoring', { error: error.message });
+        // Fallback to basic performance monitoring
+        this.setupFallbackWebVitals();
       });
+    }
+  }
+
+  /**
+   * Fallback web vitals monitoring when web-vitals library is not available
+   */
+  private setupFallbackWebVitals(): void {
+    // Monitor using Performance API directly
+    if ('PerformanceObserver' in window) {
+      try {
+        // Monitor LCP using PerformanceObserver
+        const lcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const lastEntry = entries[entries.length - 1];
+          if (lastEntry) {
+            this.recordMetric({
+              name: 'LCP',
+              value: lastEntry.startTime,
+              unit: 'ms',
+              timestamp: Date.now(),
+              tags: { vital: 'lcp', fallback: 'true', sessionId: this.sessionId },
+            });
+          }
+        });
+        lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+
+        // Monitor FCP using PerformanceObserver
+        const fcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          entries.forEach((entry) => {
+            if (entry.name === 'first-contentful-paint') {
+              this.recordMetric({
+                name: 'FCP',
+                value: entry.startTime,
+                unit: 'ms',
+                timestamp: Date.now(),
+                tags: { vital: 'fcp', fallback: 'true', sessionId: this.sessionId },
+              });
+            }
+          });
+        });
+        fcpObserver.observe({ entryTypes: ['paint'] });
+      } catch (error) {
+        logger.warn('Fallback web vitals monitoring failed', 'advanced-monitoring', { error });
+      }
     }
   }
 
@@ -1001,6 +1048,19 @@ class AdvancedPerformanceMonitoring {
     if (this.layoutShiftObserver) {
       this.layoutShiftObserver.disconnect();
     }
+  }
+
+  /**
+   * Initialize performance monitoring
+   */
+  initialize(): void {
+    // Already initialized in constructor, but this method provides
+    // explicit initialization for external calls
+    logger.info('Advanced performance monitoring initialized', 'advanced-monitoring', {
+      sessionId: this.sessionId,
+      userId: this.userId,
+      rumEnabled: this.rumConfig.enabled
+    });
   }
 
   /**

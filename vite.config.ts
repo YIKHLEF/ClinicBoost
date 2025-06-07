@@ -13,9 +13,40 @@ export default defineConfig(({ command, mode }) => {
   const isStaging = mode === 'staging';
   const isDevelopment = mode === 'development';
 
+  // Health endpoint plugin
+  const healthEndpointPlugin = {
+    name: 'health-endpoint',
+    configureServer(server: any) {
+      server.middlewares.use('/api/health', (req: any, res: any, next: any) => {
+        if (req.method === 'GET' || req.method === 'HEAD') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+          res.statusCode = 200;
+          if (req.method === 'GET') {
+            res.end(JSON.stringify({
+              status: 'healthy',
+              timestamp: new Date().toISOString(),
+              services: {
+                frontend: 'operational',
+                vite: 'operational',
+              },
+            }));
+          } else {
+            res.end();
+          }
+        } else {
+          next();
+        }
+      });
+    },
+  };
+
   return {
     plugins: [
       react(),
+      healthEndpointPlugin,
       VitePWA({
         registerType: 'autoUpdate',
         workbox: {
@@ -112,9 +143,9 @@ export default defineConfig(({ command, mode }) => {
 
     // Environment variables
     define: {
-      __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+      __APP_VERSION__: JSON.stringify(env.npm_package_version || '1.0.0'),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-      __COMMIT_SHA__: JSON.stringify(process.env.GITHUB_SHA || 'unknown'),
+      __COMMIT_SHA__: JSON.stringify(env.GITHUB_SHA || 'unknown'),
     },
 
     // Build configuration

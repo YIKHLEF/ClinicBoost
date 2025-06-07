@@ -498,7 +498,7 @@ class RealTimeAlertSystem {
 // Default configuration
 const defaultAlertConfig: RealTimeAlertConfig = {
   enabled: true,
-  websocketUrl: process.env.VITE_PERFORMANCE_WEBSOCKET_URL,
+  websocketUrl: import.meta.env.VITE_PERFORMANCE_WEBSOCKET_URL,
   alertRules: [
     {
       id: 'lcp-threshold',
@@ -539,7 +539,7 @@ const defaultAlertConfig: RealTimeAlertConfig = {
       id: 'default-webhook',
       type: 'webhook',
       config: {
-        url: process.env.VITE_PERFORMANCE_WEBHOOK_URL || 'http://localhost:3001/api/performance-alerts'
+        url: import.meta.env.VITE_PERFORMANCE_WEBHOOK_URL || 'http://localhost:3001/api/performance-alerts'
       },
       enabled: true,
       severityFilter: ['medium', 'high', 'critical']
