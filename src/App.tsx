@@ -56,6 +56,7 @@ import { ResponsiveProvider } from './hooks/useResponsive';
 
 // Integration components
 import CalendarIntegrationPage from './pages/CalendarIntegration';
+import EHRIntegrationPage from './pages/EHRIntegration';
 
 // Performance components
 import { AdvancedPerformanceDashboard } from './components/performance/AdvancedPerformanceDashboard';
@@ -183,6 +184,7 @@ const AppContent: React.FC = () => {
           <Route path="mobile-testing" element={<MobileTestingDashboard />} />
           <Route path="mobile-dashboard" element={<MobileDashboard />} />
           <Route path="calendar-integration" element={<CalendarIntegrationPage />} />
+          <Route path="ehr-integration" element={<EHRIntegrationPage />} />
           <Route path="performance" element={<AdvancedPerformanceDashboard />} />
           <Route path="config-test" element={<ConfigTest />} />
           <Route path="auth-test" element={<AuthTest />} />

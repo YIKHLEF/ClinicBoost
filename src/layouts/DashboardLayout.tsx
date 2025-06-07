@@ -66,6 +66,7 @@ const DashboardLayout: React.FC = () => {
     { name: t('navigation.mobileTesting'), path: '/mobile-testing', icon: Smartphone },
     { name: 'Mobile Dashboard', path: '/mobile-dashboard', icon: Smartphone },
     { name: 'Calendar Integration', path: '/calendar-integration', icon: Calendar },
+    { name: 'EHR/PMS Integration', path: '/ehr-integration', icon: Database },
     { name: t('navigation.integrations'), path: '/integrations', icon: Zap },
     { name: t('navigation.performance'), path: '/performance', icon: Activity },
     { name: t('navigation.offlineSettings'), path: '/offline-settings', icon: WifiOff },
