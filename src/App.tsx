@@ -54,6 +54,9 @@ import { MobileTestingDashboard } from './components/mobile/MobileTestingDashboa
 import MobileDashboard from './components/mobile/MobileDashboard';
 import { ResponsiveProvider } from './hooks/useResponsive';
 
+// Integration components
+import CalendarIntegrationPage from './pages/CalendarIntegration';
+
 // Performance components
 import { AdvancedPerformanceDashboard } from './components/performance/AdvancedPerformanceDashboard';
 
@@ -179,6 +182,7 @@ const AppContent: React.FC = () => {
           <Route path="users" element={<UserManagement />} />
           <Route path="mobile-testing" element={<MobileTestingDashboard />} />
           <Route path="mobile-dashboard" element={<MobileDashboard />} />
+          <Route path="calendar-integration" element={<CalendarIntegrationPage />} />
           <Route path="performance" element={<AdvancedPerformanceDashboard />} />
           <Route path="config-test" element={<ConfigTest />} />
           <Route path="auth-test" element={<AuthTest />} />
