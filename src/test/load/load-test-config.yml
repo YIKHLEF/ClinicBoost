@@ -1,49 +1,80 @@
 config:
   target: 'http://localhost:5173'
   phases:
-    # Warm-up phase
+    # Warm-up phase - Light load to initialize systems
     - duration: 60
       arrivalRate: 5
       name: "Warm-up"
-    # Ramp-up phase
+    # Ramp-up phase - Gradual increase to normal load
     - duration: 120
       arrivalRate: 10
       rampTo: 50
       name: "Ramp-up load"
-    # Sustained load phase
+    # Sustained load phase - Normal operating conditions
     - duration: 300
       arrivalRate: 50
       name: "Sustained load"
-    # Peak load phase
+    # Peak load phase - High traffic simulation
     - duration: 120
       arrivalRate: 100
       name: "Peak load"
+    # Stress test phase - Beyond normal capacity
+    - duration: 180
+      arrivalRate: 150
+      rampTo: 200
+      name: "Stress test"
+    # Spike test phase - Sudden traffic spikes
+    - duration: 60
+      arrivalRate: 300
+      name: "Spike test"
+    # Recovery phase - Return to normal load
+    - duration: 120
+      arrivalRate: 50
+      name: "Recovery test"
     # Cool-down phase
     - duration: 60
       arrivalRate: 10
       name: "Cool-down"
-  
-  # Performance thresholds
+
+  # Enhanced performance thresholds
   ensure:
+    - http.response_time.p50: 500   # 50th percentile response time < 500ms
     - http.response_time.p95: 2000  # 95th percentile response time < 2s
     - http.response_time.p99: 5000  # 99th percentile response time < 5s
     - http.request_rate: 45         # At least 45 requests per second
     - http.codes.200: 95            # 95% success rate
+    - http.codes.4xx: 2             # Less than 2% client errors
+    - http.codes.5xx: 1             # Less than 1% server errors
 
-  # Load testing plugins
+  # Enhanced load testing plugins
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
-    
+    publish-metrics:
+      - type: datadog
+        apiKey: "{{ $processEnvironment.DATADOG_API_KEY }}"
+        prefix: "clinicboost.loadtest"
+    expect:
+      outputFormat: json
+      outputFile: "./reports/load-test-results.json"
+
   # Environment variables
   variables:
     apiBaseUrl: "{{ $processEnvironment.VITE_SUPABASE_URL }}"
     authToken: "{{ $processEnvironment.TEST_AUTH_TOKEN }}"
+    testUserId: "{{ $processEnvironment.TEST_USER_ID }}"
+    testClinicId: "{{ $processEnvironment.TEST_CLINIC_ID }}"
+
+  # HTTP configuration
+  http:
+    timeout: 30
+    pool: 50
+    maxSockets: 50
 
 scenarios:
   # Authentication flow load test
   - name: "Authentication Load Test"
-    weight: 20
+    weight: 15
     flow:
       - post:
           url: "/auth/v1/token?grant_type=password"
@@ -55,6 +86,249 @@ scenarios:
             password: "testpassword123"
           capture:
             - json: "$.access_token"
+              as: "accessToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "access_token"
+
+  # Patient management load test
+  - name: "Patient Management Load Test"
+    weight: 25
+    flow:
+      # Login first
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "clinicuser{{ $randomInt(1, 100) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Get patients list
+      - get:
+          url: "/rest/v1/patients"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Create new patient
+      - post:
+          url: "/rest/v1/patients"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            name: "Test Patient {{ $randomInt(1, 10000) }}"
+            email: "patient{{ $randomInt(1, 10000) }}@example.com"
+            phone: "555-{{ $randomInt(1000, 9999) }}"
+            date_of_birth: "1990-01-01"
+            clinic_id: "{{ testClinicId }}"
+          capture:
+            - json: "$.id"
+              as: "patientId"
+          expect:
+            - statusCode: 201
+
+      # Get patient details
+      - get:
+          url: "/rest/v1/patients?id=eq.{{ patientId }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # Appointment scheduling load test
+  - name: "Appointment Scheduling Load Test"
+    weight: 20
+    flow:
+      # Login
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "scheduler{{ $randomInt(1, 50) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Get available time slots
+      - get:
+          url: "/rest/v1/appointments?select=*&date=gte.{{ $moment().format('YYYY-MM-DD') }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Create appointment
+      - post:
+          url: "/rest/v1/appointments"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            patient_id: "{{ testUserId }}"
+            clinic_id: "{{ testClinicId }}"
+            date: "{{ $moment().add(1, 'days').format('YYYY-MM-DD') }}"
+            time: "{{ $moment().add(1, 'hours').format('HH:mm') }}"
+            type: "consultation"
+            status: "scheduled"
+          expect:
+            - statusCode: 201
+
+  # Dashboard and analytics load test
+  - name: "Dashboard Analytics Load Test"
+    weight: 15
+    flow:
+      # Login
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "analyst{{ $randomInt(1, 20) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Get dashboard metrics
+      - get:
+          url: "/rest/v1/rpc/get_dashboard_metrics"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Get patient analytics
+      - get:
+          url: "/rest/v1/rpc/get_patient_analytics"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Get revenue analytics
+      - get:
+          url: "/rest/v1/rpc/get_revenue_analytics"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # File upload and image optimization test
+  - name: "File Upload Load Test"
+    weight: 10
+    flow:
+      # Login
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "uploader{{ $randomInt(1, 30) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Upload patient document
+      - post:
+          url: "/storage/v1/object/patient-documents/test-doc-{{ $randomInt(1, 1000) }}.pdf"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+            Content-Type: "application/pdf"
+          body: "{{ $randomBytes(1024) }}"
+          expect:
+            - statusCode: 200
+
+  # Search and filtering load test
+  - name: "Search and Filter Load Test"
+    weight: 10
+    flow:
+      # Login
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "searcher{{ $randomInt(1, 25) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Search patients
+      - get:
+          url: "/rest/v1/patients?name=ilike.*test*"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Filter appointments
+      - get:
+          url: "/rest/v1/appointments?status=eq.scheduled&date=gte.{{ $moment().format('YYYY-MM-DD') }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Complex search with joins
+      - get:
+          url: "/rest/v1/patients?select=*,appointments(*),treatments(*)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # Real-time features load test
+  - name: "Real-time Features Load Test"
+    weight: 5
+    flow:
+      # Login
+      - post:
+          url: "/auth/v1/token?grant_type=password"
+          headers:
+            Content-Type: "application/json"
+            apikey: "{{ authToken }}"
+          json:
+            email: "realtime{{ $randomInt(1, 15) }}@example.com"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "accessToken"
+
+      # Subscribe to real-time updates (WebSocket simulation)
+      - get:
+          url: "/realtime/v1/websocket"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            apikey: "{{ authToken }}"
+          expect:
+            - statusCode: 101
               as: "accessToken"
       - think: 2
 
