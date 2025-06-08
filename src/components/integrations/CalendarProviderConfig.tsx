@@ -19,7 +19,7 @@ import {
   CheckCircle,
   ExternalLink,
   Key,
-  Sync,
+  RotateCcw,
   ArrowUpDown,
   ArrowRight,
   ArrowLeft,
@@ -234,7 +234,7 @@ const CalendarProviderConfig: React.FC<CalendarProviderConfigProps> = ({
               >
                 {isLoading ? (
                   <>
-                    <Sync className="animate-spin mr-2" size={16} />
+                    <RotateCcw className="animate-spin mr-2" size={16} />
                     Testing Connection...
                   </>
                 ) : (

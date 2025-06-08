@@ -101,10 +101,16 @@ import { performanceOptimizer } from './lib/mobile/performance-optimizer';
 const AppContent: React.FC = () => {
   const { user } = useAuth();
 
-  // Initialize integration systems
+  // Initialize integration systems (simplified for development)
   React.useEffect(() => {
     const initializeIntegrations = async () => {
       try {
+        // Skip complex initialization in development
+        if (import.meta.env.DEV) {
+          console.log('Development mode: Skipping complex integrations');
+          return;
+        }
+
         // Initialize calendar sync
         await calendarSync.initialize();
 

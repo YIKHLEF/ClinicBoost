@@ -24,7 +24,7 @@ import {
   Clock,
   Users,
   Activity,
-  Sync,
+  RotateCcw,
   ExternalLink,
   Shield,
   Zap,
@@ -322,7 +322,7 @@ const EHRIntegration: React.FC = () => {
             {isSyncing ? (
               <RefreshCw size={16} className="mr-2 animate-spin" />
             ) : (
-              <Sync size={16} className="mr-2" />
+              <RotateCcw size={16} className="mr-2" />
             )}
             Sync All
           </Button>
@@ -446,7 +446,7 @@ const EHRIntegration: React.FC = () => {
                       onClick={() => handleProviderSync(provider.id)}
                       disabled={!provider.enabled || isSyncing}
                     >
-                      <Sync size={14} className="mr-1" />
+                      <RotateCcw size={14} className="mr-1" />
                       Sync
                     </Button>
                   </div>

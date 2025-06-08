@@ -22,7 +22,7 @@ import { Card, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { GlobalSearchResult, SearchResult, SearchEntityType } from '../../lib/search/search-service';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 interface SearchResultsProps {
   results: GlobalSearchResult;

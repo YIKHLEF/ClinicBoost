@@ -13,7 +13,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 
 // Mock data for revenue chart
 const revenueData = [

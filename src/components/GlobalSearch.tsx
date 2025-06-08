@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, User, Calendar, FileText, Clock, X, CreditCard, Stethoscope } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 import { useQuickSearch } from '../hooks/useSearch';
 import { SearchEntityType } from '../lib/search/search-service';
 

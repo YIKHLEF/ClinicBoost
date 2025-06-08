@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 
 interface ThemeToggleProps {
   className?: string;

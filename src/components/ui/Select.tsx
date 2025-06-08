@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   onValueChange?: (value: string) => void;

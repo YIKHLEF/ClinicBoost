@@ -14,7 +14,7 @@ import {
 import { Button } from '../ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { GlobalSearchFilters, SearchEntityType } from '../../lib/search/search-service';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 interface AdvancedSearchFiltersProps {
   filters: GlobalSearchFilters;

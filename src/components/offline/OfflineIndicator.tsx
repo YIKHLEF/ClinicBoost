@@ -1,7 +1,7 @@
 import React from 'react';
 import { WifiOff, Wifi, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useOffline } from '../../contexts/OfflineContext';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 interface OfflineIndicatorProps {
   className?: string;

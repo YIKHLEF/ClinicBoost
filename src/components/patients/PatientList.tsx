@@ -6,7 +6,7 @@ import { Card } from '../ui/Card';
 import { AdvancedTable, type Column } from '../ui/AdvancedTable';
 import { EmptyState, PatientsEmptyState } from '../ui/EmptyState';
 import { User, Phone, MapPin, AlertTriangle, CheckCircle2, Clock, Mail, Calendar, Shield } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 import type { Database } from '../../lib/database.types';
 
 type Patient = Database['public']['Tables']['patients']['Row'];

@@ -11,7 +11,7 @@ import {
   WifiOff
 } from 'lucide-react';
 import { useOffline } from '../../contexts/OfflineContext';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 interface SyncDashboardProps {
   className?: string;

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { AdvancedSearchFilters } from '../components/search/AdvancedSearchFilters';
 import { SearchResults } from '../components/search/SearchResults';
 import { useSearch, useSearchAnalytics } from '../hooks/useSearch';
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 
 const Search: React.FC = () => {
   const { t } = useTranslation();

@@ -14,7 +14,7 @@ import {
   addDays,
   isToday
 } from 'date-fns';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 export interface CalendarEvent {
   id: string;

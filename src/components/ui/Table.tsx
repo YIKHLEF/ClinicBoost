@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../lib/utils';
 
 export interface Column<T> {
   key: keyof T | string;

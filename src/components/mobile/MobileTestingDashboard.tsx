@@ -23,7 +23,7 @@ import {
   Bell,
   Share2,
   Maximize,
-  Touch,
+  Hand,
 } from 'lucide-react';
 import {
   mobileTestingFramework,
@@ -587,7 +587,7 @@ export const MobileTestingDashboard: React.FC = () => {
             }}
           >
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-800">
-              <Touch className="mx-auto text-gray-400 mb-4" size={48} />
+              <Hand className="mx-auto text-gray-400 mb-4" size={48} />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Touch Gesture Test Area
               </h3>
@@ -599,7 +599,7 @@ export const MobileTestingDashboard: React.FC = () => {
 
           <div className="space-y-4">
             <Button onClick={testTouchGestures} className="w-full">
-              <Touch size={16} className="mr-2" />
+              <Hand size={16} className="mr-2" />
               Test Touch Gestures
             </Button>
 

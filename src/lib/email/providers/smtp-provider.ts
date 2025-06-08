@@ -1,58 +1,48 @@
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+// Browser-safe SMTP provider - delegates to backend API
+// Note: nodemailer is only used on the server side
 import type { EmailProvider, EmailMessage, EmailSendResult, EmailDeliveryStatus, EmailConfig } from '../types';
 import { logger } from '../../logging-monitoring';
 import { handleError } from '../../error-handling';
 
 export class SMTPProvider implements EmailProvider {
   public readonly name = 'smtp';
-  private transporter: Transporter | null = null;
   private config: EmailConfig;
 
   constructor(config: EmailConfig) {
     this.config = config;
-    this.initializeTransporter();
+    this.initialize();
   }
 
-  private initializeTransporter(): void {
+  private initialize(): void {
     if (!this.config.smtp) {
       throw new Error('SMTP configuration is required for SMTP provider');
     }
 
-    try {
-      this.transporter = nodemailer.createTransporter({
-        host: this.config.smtp.host,
-        port: this.config.smtp.port,
-        secure: this.config.smtp.secure || false,
-        auth: this.config.smtp.auth ? {
-          user: this.config.smtp.auth.user,
-          pass: this.config.smtp.auth.pass,
-        } : undefined,
-        tls: {
-          rejectUnauthorized: false, // For development with self-signed certificates
-        },
-      });
-
-      logger.info('SMTP transporter initialized', 'email-smtp', {
-        host: this.config.smtp.host,
-        port: this.config.smtp.port,
-        secure: this.config.smtp.secure,
-      });
-    } catch (error: any) {
-      logger.error('Failed to initialize SMTP transporter', 'email-smtp', { error: error.message });
-      throw error;
-    }
+    logger.info('SMTP provider initialized (browser-safe)', 'email-smtp', {
+      host: this.config.smtp.host,
+      port: this.config.smtp.port,
+      secure: this.config.smtp.secure,
+    });
   }
 
   async validateConfig(): Promise<boolean> {
-    if (!this.transporter) {
-      return false;
-    }
-
     try {
-      await this.transporter.verify();
-      logger.info('SMTP configuration validated successfully', 'email-smtp');
-      return true;
+      // In browser environment, validate by making API call to backend
+      const response = await fetch('/api/email/validate-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'smtp', config: this.config.smtp }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        logger.info('SMTP configuration validated successfully', 'email-smtp');
+        return true;
+      } else {
+        logger.error('SMTP configuration validation failed', 'email-smtp', { error: result.error });
+        return false;
+      }
     } catch (error: any) {
       logger.error('SMTP configuration validation failed', 'email-smtp', { error: error.message });
       return false;
@@ -60,51 +50,58 @@ export class SMTPProvider implements EmailProvider {
   }
 
   async sendEmail(message: EmailMessage): Promise<EmailSendResult> {
-    if (!this.transporter) {
-      return {
-        success: false,
-        error: 'SMTP transporter not initialized',
-      };
-    }
-
     try {
-      const mailOptions = {
-        from: this.config.from,
-        to: Array.isArray(message.to) ? message.to.join(', ') : message.to,
-        cc: message.cc ? (Array.isArray(message.cc) ? message.cc.join(', ') : message.cc) : undefined,
-        bcc: message.bcc ? (Array.isArray(message.bcc) ? message.bcc.join(', ') : message.bcc) : undefined,
-        subject: message.subject,
-        html: message.html,
-        text: message.text,
-        attachments: message.attachments?.map(att => ({
-          filename: att.filename,
-          content: att.content,
-          contentType: att.contentType,
-          encoding: att.encoding as any,
-          cid: att.cid,
-        })),
-        priority: message.priority === 'high' ? 'high' : message.priority === 'low' ? 'low' : 'normal',
-        headers: {
-          'X-Email-Tags': message.tags?.join(','),
-          'X-Email-Metadata': message.metadata ? JSON.stringify(message.metadata) : undefined,
-        },
-      };
-
-      const result = await this.transporter.sendMail(mailOptions);
-
-      logger.info('Email sent successfully via SMTP', 'email-smtp', {
-        messageId: result.messageId,
-        to: message.to,
-        subject: message.subject,
+      // In browser environment, send email via backend API
+      const response = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'smtp',
+          message: {
+            from: this.config.from,
+            to: Array.isArray(message.to) ? message.to : [message.to],
+            cc: message.cc ? (Array.isArray(message.cc) ? message.cc : [message.cc]) : undefined,
+            bcc: message.bcc ? (Array.isArray(message.bcc) ? message.bcc : [message.bcc]) : undefined,
+            subject: message.subject,
+            html: message.html,
+            text: message.text,
+            attachments: message.attachments,
+            priority: message.priority,
+            tags: message.tags,
+            metadata: message.metadata,
+          },
+        }),
       });
 
-      return {
-        success: true,
-        messageId: result.messageId,
-        details: result,
-      };
+      const result = await response.json();
+
+      if (result.success) {
+        logger.info('Email sent successfully via SMTP API', 'email-smtp', {
+          messageId: result.messageId,
+          to: message.to,
+          subject: message.subject,
+        });
+
+        return {
+          success: true,
+          messageId: result.messageId,
+          details: result.details,
+        };
+      } else {
+        logger.error('Failed to send email via SMTP API', 'email-smtp', {
+          error: result.error,
+          to: message.to,
+          subject: message.subject,
+        });
+
+        return {
+          success: false,
+          error: result.error,
+          details: result.details,
+        };
+      }
     } catch (error: any) {
-      logger.error('Failed to send email via SMTP', 'email-smtp', {
+      logger.error('Failed to send email via SMTP API', 'email-smtp', {
         error: error.message,
         to: message.to,
         subject: message.subject,
@@ -156,10 +153,7 @@ export class SMTPProvider implements EmailProvider {
   }
 
   async close(): Promise<void> {
-    if (this.transporter) {
-      this.transporter.close();
-      this.transporter = null;
-      logger.info('SMTP transporter closed', 'email-smtp');
-    }
+    // No cleanup needed in browser environment
+    logger.info('SMTP provider closed', 'email-smtp');
   }
 }

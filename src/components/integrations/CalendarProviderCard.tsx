@@ -20,7 +20,7 @@ import {
   ExternalLink,
   Clock,
   Users,
-  Sync,
+  RotateCcw,
   ArrowUpDown,
   ArrowRight,
   ArrowLeft,
@@ -298,7 +298,7 @@ const CalendarProviderCard: React.FC<CalendarProviderCardProps> = ({
             {isSyncing ? (
               <RefreshCw size={14} className="mr-1 animate-spin" />
             ) : (
-              <Sync size={14} className="mr-1" />
+              <RotateCcw size={14} className="mr-1" />
             )}
             Sync Now
           </Button>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Languages, Check, Globe } from 'lucide-react';
-import { cn } from '../utils/cn';
+import { cn } from '../lib/utils';
 import useTranslation from '../hooks/useTranslation';
 
 interface LanguageSwitcherProps {

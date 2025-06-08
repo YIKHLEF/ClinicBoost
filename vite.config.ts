@@ -187,17 +187,23 @@ export default defineConfig(({ command, mode }) => {
 
     // Development server
     server: {
-      port: 5173,
+      port: 5174, // Use consistent port
       host: true,
       open: isDevelopment,
       cors: true,
-      proxy: {
-        '/api': {
-          target: env.VITE_API_URL || 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false,
-        },
+      hmr: {
+        port: 5174, // Fix WebSocket connection
       },
+      // Only use proxy if VITE_API_URL is explicitly set
+      ...(env.VITE_API_URL && {
+        proxy: {
+          '/api': {
+            target: env.VITE_API_URL,
+            changeOrigin: true,
+            secure: false,
+          },
+        },
+      }),
     },
 
     // Preview server
